@@ -26,5 +26,13 @@ int main(){
     assert(p.exportMidi(1,file));juce::FileInputStream stream(file);juce::MidiFile midi;assert(midi.readFrom(stream)&&midi.getNumTracks()==1&&midi.getTimeFormat()==960);
     assert(midi.getLastTimestamp()==p.get(1,"bars")*4*960);for(int i=0;i<midi.getTrack(0)->getNumEvents();++i){auto msg=midi.getTrack(0)->getEventPointer(i)->message;assert(msg.isController()||msg.isEndOfTrackMetaEvent());if(msg.isController())assert(msg.getChannel()==3&&msg.getControllerNumber()==75);}
     stream.setPosition(0);file.deleteFile();
+    // V2.1 sessions preserve drawings/settings, never load their hosted slots.
+    juce::ValueTree legacy("CURVEPILOT_SESSION"),parameters("PARAMETERS"),content("CONTENT"),lane("LANE"),slot("SLOT");
+    parameters.addChild(p.state.copyState(),-1,nullptr);legacy.addChild(parameters,-1,nullptr);
+    lane.setProperty("index",1,nullptr);lane.setProperty("name","Ancien filtre",nullptr);
+    auto drawing=p.getLane(1).curve;juce::MemoryBlock blob(drawing.y.data(),drawing.y.size()*sizeof(float));lane.setProperty("curve",blob.toBase64Encoding(),nullptr);content.addChild(lane,-1,nullptr);slot.setProperty("description","invalid hosted plugin",nullptr);content.addChild(slot,-1,nullptr);legacy.addChild(content,-1,nullptr);
+    juce::MemoryBlock old;juce::AudioProcessor::copyXmlToBinary(*legacy.createXml(),old);restored.setStateInformation(old.getData(),(int)old.getSize());
+    assert(restored.getLane(1).curve.y==drawing.y&&restored.getLane(1).port.isEmpty()&&restored.get(1,"on")==0&&!restored.sending);
+    auto state=restored.state.copyState();state.getChildWithProperty("id","lane2_bars").setProperty("value",-5.0,nullptr);parameters.removeAllChildren(nullptr);parameters.addChild(state,-1,nullptr);juce::AudioProcessor::copyXmlToBinary(*legacy.createXml(),old);restored.setStateInformation(old.getData(),(int)old.getSize());assert(restored.get(1,"bars")==.25f);
     std::cout<<"PASS: points, clipboard preserves destination, undo preserves new routing, locks, MIDI takeover, state, editor, silent audio and CC-only SMF export\n";
 }

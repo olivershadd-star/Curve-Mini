@@ -54,8 +54,10 @@ bool CurvePilot::isManual(int i)const{return lanes[(size_t)i].manual||manualRequ
 void CurvePilot::resumeCurve(int i){const ScopedLock lock(mutex);manualRequests[(size_t)i]=false;lanes[(size_t)i].manual=false;lanes[(size_t)i].filterValid=false;lanes[(size_t)i].last=-1;revision++;}
 void CurvePilot::resetOutputValues(){for(auto& l:lanes){l.last=-1;l.filterValid=false;}}
 void CurvePilot::configureDestination(int i,bool hardware,const String& port,int channel,int cc,const String& name){
-    const ScopedLock lock(mutex);auto& l=lanes[(size_t)i];sending=false;
-    if(l.port!=port)outputs.clear();l.hardware=hardware;l.port=port;l.channel=jlimit(1,16,channel);l.cc=jlimit(0,127,cc);l.name=name;resetOutputValues();status="Destination modifiee. Connecter les sorties puis activer ENVOI.";revision++;
+    const ScopedLock lock(mutex);auto& l=lanes[(size_t)i];channel=jlimit(1,16,channel);cc=jlimit(0,127,cc);
+    const bool changed=l.hardware!=hardware||l.port!=port||l.channel!=channel||l.cc!=cc;
+    if(!changed){if(l.name!=name){l.name=name;revision++;}return;}
+    sending=false;if(l.port!=port)outputs.clear();l.hardware=hardware;l.port=port;l.channel=channel;l.cc=cc;l.name=name;resetOutputValues();status="Destination modifiee. Connecter les sorties puis activer ENVOI.";revision++;
 }
 void CurvePilot::connectOutputs(){
     const ScopedLock lock(mutex);sending=false;outputs.clear();resetOutputValues();StringArray ids;for(auto& l:lanes)if(l.port.isNotEmpty())ids.addIfNotAlreadyThere(l.port);
@@ -118,7 +120,12 @@ void CurvePilot::setStateInformation(const void* bytes,int size){
     auto xml=getXmlFromBinary(bytes,size);if(!xml||(!xml->hasTagName("CURVE_MINI_SESSION")&&!xml->hasTagName("CURVEPILOT_SESSION")))return;
     const bool legacy=xml->hasTagName("CURVEPILOT_SESSION");auto tree=ValueTree::fromXml(*xml);auto parameters=legacy?tree.getChildWithName("PARAMETERS").getChild(0).createCopy():tree.getChildWithName("CurvePilot").createCopy();if(!parameters.isValid())return;
     const ScopedLock lock(mutex);sending=false;outputs.clear();
-    for(auto* param:getParameters())if(auto* ranged=dynamic_cast<RangedAudioParameter*>(param))if(!parameters.getChildWithProperty("id",ranged->paramID).isValid()){ValueTree v("PARAM");v.setProperty("id",ranged->paramID,nullptr);v.setProperty("value",ranged->convertFrom0to1(ranged->getDefaultValue()),nullptr);parameters.addChild(v,-1,nullptr);}state.replaceState(parameters);
+    for(auto* param:getParameters())if(auto* ranged=dynamic_cast<RangedAudioParameter*>(param)){
+        auto v=parameters.getChildWithProperty("id",ranged->paramID);if(!v.isValid()){v=ValueTree("PARAM");v.setProperty("id",ranged->paramID,nullptr);parameters.addChild(v,-1,nullptr);}
+        double value=(double)v.getProperty("value",ranged->convertFrom0to1(ranged->getDefaultValue()));
+        if(!std::isfinite(value))value=ranged->convertFrom0to1(ranged->getDefaultValue());
+        const auto& range=ranged->getNormalisableRange();v.setProperty("value",range.snapToLegalValue(jlimit(range.start,range.end,(float)value)),nullptr);
+    }state.replaceState(parameters);
     auto content=tree.getChildWithName("CONTENT");editorWidth=jlimit(820,3200,(int)content.getProperty("width",1380));editorHeight=jlimit(560,2200,(int)content.getProperty("height",880));selectedLaneUI=jlimit(0,11,(int)content.getProperty("selected",0));double bpm=(double)content.getProperty("standaloneBpm",120);standaloneBpm=std::isfinite(bpm)?jlimit(20.,300.,bpm):120;
     for(int i=0;i<laneCount;++i){lanes[(size_t)i]=Lane{};lanes[(size_t)i].cc=20+i;lanes[(size_t)i].name="Courbe "+String(i+1);previous[(size_t)i].reset();}
     for(auto v:content)if(v.hasType("LANE")){int i=(int)v["index"];if(i<0||i>=laneCount)continue;auto& l=lanes[(size_t)i];l.name=v["name"].toString();l.port=legacy?String{}:v["port"].toString();l.channel=jlimit(1,16,(int)v.getProperty("channel",16));l.cc=jlimit(0,127,(int)v.getProperty("cc",20+i));l.hardware=(bool)v["hardware"];l.manual=!legacy&&(bool)v["manual"];l.locked=(bool)v["locked"];l.pointMode=(bool)v["pointMode"];l.script=v["script"].toString();l.motionText=v["motionText"].toString();l.curve.bars=get(i,"bars");
