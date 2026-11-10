@@ -37,12 +37,34 @@ et réouverture, traitement silencieux, sauvegarde et recréation avec restaurat
 Le test a un délai limite de 90 secondes.
 
 Un script Windows vérifie le bundle, l'architecture PE x64, GetPluginFactory,
-InitDll, ExitDll et les dépendances. Le workflow télécharge aussi l'ancien
-artefact pour une comparaison de dépendances et de chargement, sans en faire
-une condition de disponibilité du correctif.
+InitDll, ExitDll et les dépendances. Une comparaison ponctuelle avec l’ancien artefact a également été tentée
+dans le build de diagnostic. Elle a échoué car son jeton ne disposait pas de
+l’accès Actions nécessaire (Resource not accessible by integration). Aucun
+résultat de chargement de cet ancien binaire n’en est donc déduit. Ces étapes
+ponctuelles ont ensuite été retirées du workflow permanent.
 
-Les résultats de compilation et de chargement sont à renseigner après le build.
-Le résultat dans Ableton n'est pas encore connu.
+## Résultat Windows établi
+
+Build réussi sur le commit 3aa200628613d146e2e0ae726c87961fabc3e312 :
+https://github.com/olivershadd-star/Curve-Mini/actions/runs/42870573329
+
+- midi_model : réussi.
+- plugin_state : réussi.
+- vst3_load : réussi (0,70 seconde), module réellement chargé, fenêtre native
+  attachée/détachée trois fois, traitement silencieux et rechargement de l'état.
+- Inspection du module x64, des exports VST3 et des dépendances : réussie ;
+  aucun MSVCP/VCRUNTIME/CONCRT externe.
+- Artefact publié : Curve-Mini-Prototype-0.2.1-Windows-x64, ID 13789662496.
+
+Le résultat dans Ableton sur le poste utilisateur n'est pas encore connu.
+La comparaison des sources de Midi Editor et Resonant Lab a ensuite confirmé
+qu'ils déclaraient tous deux NEEDS_MIDI_INPUT TRUE et acceptsMidi() true,
+contrairement à Mini 0.2 avant correction. Cette différence est établie ; le
+refus spécifique de Live n'a pas été reproduit sur le runner Windows.
+
+Le nettoyage ultérieur du workflow retire uniquement les étapes comparatives
+ponctuelles ; il ne change pas le code ni le VST3 testé. Aucun rebuild n'est
+nécessaire pour ce nettoyage (commit marqué [skip ci]).
 
 ## Installation
 

@@ -37,23 +37,6 @@ jobs:
         run: ./tools/check-vst3.ps1 -Bundle 'build/CurvePilotMidi01_artefacts/Release/VST3/Curve Mini Prototype 0.2.vst3'
       - name: Tester les sauvegardes, les potards et le chargement VST3
         run: ctest --test-dir build -C Release --output-on-failure
-      - name: Telecharger le precedent paquet pour diagnostic comparatif
-        uses: actions/download-artifact@v4
-        continue-on-error: true
-        with:
-          name: Curve-Mini-Prototype-0.2-Windows-x64
-          run-id: 42853157169
-          github-token: ${{ github.token }}
-          path: previous-package
-      - name: Inspecter le precedent VST3 (diagnostic uniquement)
-        continue-on-error: true
-        shell: pwsh
-        run: |
-          $bundle = Get-ChildItem previous-package -Recurse -Directory -Filter '*.vst3' | Select-Object -First 1
-          if (!$bundle) { throw 'Previous VST3 bundle absent' }
-          ./tools/check-vst3.ps1 -Bundle $bundle.FullName -AllowSharedRuntime
-          & 'build/vst3_load_tests_artefacts/Release/Curve Mini VST3 Load Test.exe' $bundle.FullName --legacy-diagnostic
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         with:
           name: Curve-Mini-Prototype-0.2.1-Windows-x64
