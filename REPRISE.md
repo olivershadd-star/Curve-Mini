@@ -1,56 +1,44 @@
-# Reprise Curve Mini — 7 novembre 2026
+# Curve Mini — évolution du 10 novembre 2026
 
-Sources importées du ZIP ANKS_Curve_Pilot_Prototype_0_1_Sources_Windows.zip.
-Prototype confirmé : instrument de contrôle silencieux, sortie MIDI système,
-aucun hébergement audio. Aucun ancien projet remplacé.
+## Périmètre réalisé
 
-## Changements
+- CC 0–127, canal 1–16, sortie globale ou distincte par ligne. Ports mutualisés.
+- Protection contre deux lignes actives sur la même adresse complète.
+- 12 paramètres hôte stables lane1_value à lane12_value, valeurs entières 0–127.
+  Assignation MIDI et automation assurées par Live, sans Max for Live.
+- Le mouvement d'un paramètre prend la main sur sa seule ligne. Retour explicite
+  à COURBE. Manuel à l'arrêt, courbes en lecture uniquement, ENVOI OFF coupe les deux.
+- Export d'un tour de dessin en SMF0, sans notes ni tempo, longueur exacte,
+  signature rythmique publiée par Live, minimum/maximum et inversion appliqués.
+- Migration des sauvegardes 0.1 : CC20–31/canal1, courbes inchangées. Code Cpm1,
+  cible CurvePilotMidi01 et XML CURVE_PILOT_MIDI_01 conservés.
+- Version produit 0.2.0, nom visible et artefact 0.2 ; chemins CMake cohérents.
+- Build Windows automatique après changement du code sur main, manuel toujours possible.
 
-- Nom visible, produit VST3, documentation et artefact : Curve Mini Prototype 0.1.
-- Cible CMake CurvePilotMidi01, code Cpm1 et XML CURVE_PILOT_MIDI_01 conservés.
-  Les chemins d'artefacts restent donc CurvePilotMidi01_artefacts ; le nom du
-  dossier VST3 devient Curve Mini Prototype 0.1.vst3.
-- Restauration : désarmement et fermeture du port précédent. Connecter reste
-  nécessaire avant ENVOI, même lorsqu'un état est chargé dans une instance active.
-- Transport : aucune émission automatique si Live ne publie pas de position PPQ
-  finie. Auparavant, une ancienne position pouvait être réutilisée.
-- Accès à armed, selectedPort et standaloneTempo depuis l'éditeur protégés par
-  le verrou déjà utilisé pour la restauration, hors callback audio.
-- Calcul de phase corrigé pour les mesures de moins d'une noire (ex. 1/8).
-- Vérification de l'indice avant l'émission manuelle Assigner.
+## Validation
 
-## Vérification locale
+Le test C++17 local du modèle et des exports réussit. Il relit les fichiers MIDI
+avec un décodeur indépendant, vérifie six formes, inversion, valeurs, adresses,
+signature 7/8, durée exacte des boucles constantes et courtes, absence de notes,
+conflits par port/canal/CC et rejets des données invalides.
 
-Commande exécutée avec succès :
+Tests d'intégration ajoutés au workflow Windows : paramètres réels APVTS,
+prise de main par ligne, sauvegarde avant consommation du mouvement, restauration
+des modes et valeurs, réouverture de l'éditeur, anciens états et entrées hors
+bornes, transport manquant / saut de boucle, relecture du fichier MIDI par JUCE.
+La compilation et ces tests Windows sont à confirmer par le build de ce commit.
 
-```sh
-g++ -std=c++17 -Wall -Wextra -pedantic tests/midi_tests.cpp -o /tmp/curve-mini-midi-tests
-/tmp/curve-mini-midi-tests
-```
+Aucun essai utilisateur de cette évolution dans Live ni sur groovebox n'a encore
+été fait. L'import des CC est documenté par Ableton, mais doit être essayé avec
+ce fichier. Le partage d'une sortie USB dépend du pilote ; le README décrit le
+relais loopMIDI/Live si l'ouverture directe n'est pas possible.
 
-Cas supplémentaires : mesure 1/8, retour de position de boucle, âge NaN.
-CMake indisponible dans cet environnement : aucun build complet effectué.
-Aucune nouvelle vérification de compilation JUCE ni intégration MIDI réelle.
-Les corrections de port, restauration et transport devront être vérifiées sous
-Windows ; les tests de modèle seuls ne les valident pas.
+## Premier parcours utilisateur
 
-## Examen de fiabilité
+Installer 0.2 en remplacement de 0.1. Une ligne CC70/canal1 -> machine, tester
+potard souris à l'arrêt puis courbe en lecture, puis assignation du contrôleur
+physique via Configure/Ctrl+M. Ajouter une seconde adresse. Tester fenêtre fermée,
+ENVOI OFF, arrêt/reprise, réouverture avec reconnexion. Exporter une ligne, importer
+sur un clip vide, choisir MIDI Ctrl et son CC. Comparer la charge au set sans Mini.
 
-Le timer appartient au processeur et continue donc sans éditeur. Le callback
-ne prend pas le verrou control et n'appelle pas le pilote MIDI. Le timer refuse
-une publication en cours et un transport arrêté ou périmé. Les positions de Live
-sont relues à chaque publication, y compris après saut de boucle. Ces constats
-proviennent du code ; leur comportement dans Live reste à vérifier.
-Un port débranché peut rester représenté par un objet MidiOutput ; sendMessageNow
-ne fournit pas d'accusé de réception. Le statut « connecté » ne prouve donc pas
-la réception réelle. Recréer le port puis Actualiser/Connecter si nécessaire.
-
-## Suite
-
-Créer un dépôt GitHub distinct, importer ces sources, puis lancer le workflow
-manuel Curve Mini Prototype 0.1 Windows. Le workflow compile les tests puis le
-VST3 et l'autonome sous Windows x64. Aucun workflow n'a encore été déclenché.
-
-Essai utilisateur après compilation : ligne 1 -> macro 1, puis ligne 2 -> macro 2,
-arrêt/reprise, saut de boucle, fenêtre fermée, sauvegarde et réouverture avec
-reconnexion explicite. Comparer la charge au même set sans Mini. Voir README_FR.md.
+Le détail de la reprise initiale est dans docs/REPRISE_2026-11-07.md.
