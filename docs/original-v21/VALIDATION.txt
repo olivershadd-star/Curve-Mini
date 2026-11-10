@@ -1,0 +1,24 @@
+ANKS Curve Pilot V2.1 reprise R2 — 5 novembre 2026
+
+Effectué localement sous Linux :
+- CMake/CTest Release moteur seul : 2/2 tests réussis (courbes/rack/horloge et traducteur).
+- Traducteur avec AddressSanitizer et UndefinedBehaviorSanitizer : réussi, LeakSanitizer désactivé pour cet environnement.
+- Vérification C++17 stricte contre JUCE 8.0.6 : Plugin.cpp, Editor.cpp et scénario de test UI, chemins Linux ; modes plugin et autonome.
+
+Fourni, à exécuter par le workflow Windows :
+- Test interface : trois pages, masquage des cartes, page appareil, prévisualisation/application, conservation de l'instance, tailles 820x560 et 1200x800, zoom 50/100/150, accès aux bords par défilement.
+- Branche Windows du test : une surface HWND simulée dépend d'un peer enfant de clipping distinct de la fenêtre principale.
+- Compilation VST3 et application autonome.
+
+Limites de validation :
+Le test graphique n'a pas été exécuté localement : bibliothèques graphiques et serveur X absents, installation des dépendances indisponible dans cet environnement. Le code de test graphique a été vérifié syntaxiquement, ce qui ne constitue pas son exécution.
+Aucun binaire Windows compilé ni lancé ici ; la branche WinAPI attend la compilation/test GitHub. Pas d'essai réel avec Serum ou Resonant Lab à 300 % ici.
+La correction est proposée dans les sources, pas déclarée validée sur les plugins tiers.
+
+Contrôle utilisateur après build réussi :
+1. Lire le repère V2.1 R2 / 3 PAGES.
+2. Charger Serum, passer Courbes -> Synthe -> Page appareil, revenir. Vérifier qu'aucune courbe ne reste sous l'appareil dans les pages qui la masquent.
+3. Tester 50 %, 100 %, 150 %, redimensionner et atteindre bas/droite par les barres. Refaire avec Resonant Lab, puis un effet.
+4. Vérifier les notes MIDI et les modulations pendant les changements de page.
+5. Sur une ligne, Decrire / Code, prévisualiser l'exemple et appliquer ; vérifier qu'une phrase refusée laisse l'ancienne courbe intacte.
+6. Sauvegarder, réouvrir, tester autonome et VST3 sur une copie des sessions.

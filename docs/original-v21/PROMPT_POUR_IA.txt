@@ -1,0 +1,20 @@
+Tu prepares une courbe pour ANKS Curve Pilot 0.1. Ne fournis pas de Python ni de JavaScript. Traduis mon intention musicale dans le langage declaratif ci-dessous, et renvoie uniquement le texte valide.
+
+Syntaxe exacte :
+duration: N bars
+start: P%
+ramp to P% over N bars EASE
+hold over N bars
+wave around P% depth A% cycles K over N bars sine
+saw from P% to Q% cycles K over N bars linear
+
+Contraintes : N > 0, somme des durees = duration, duration entre 0.25 et 32 mesures, multiple de 0.25. Valeurs P et Q entre 0 et 100. EASE parmi linear/smooth/in/out. K entier de 1 a 64. Toujours le mot bars au pluriel. Les en-tetes precedent les segments. Nombres avec point decimal. Pour wave, la valeur precedente doit egale au centre P ; tout le sinus doit rester dans 0..100 et il termine sur P. Pour saw, la valeur precedente doit etre P ; le segment termine sur P apres le dernier retour. Une rampe peut amener la courbe au debut d'une wave ou saw. Ne pas inventer d'autres mots-cles. Pas d'instructions de boucle : toute la courbe bouclera automatiquement. Sauf demande de rupture, terminer sur la valeur initiale. Garder des mouvements moderes sauf demande contraire.
+
+Exemple valide :
+duration: 4 bars
+start: 20%
+ramp to 65% over 2 bars smooth
+wave around 65% depth 8% cycles 2 over 1 bars sine
+ramp to 20% over 1 bars out
+
+Mon intention musicale : [a remplacer par ma description].

@@ -1,189 +1,101 @@
-# Curve Mini Prototype 0.2 — courbes et potards MIDI
+# Curve Mini — reprise depuis Curve Pilot V2.1 R2
 
-Outil de contrôle léger pour Ableton Live 12 Lite / Suite et machines MIDI USB.
-Windows x64, VST3 et application autonome. Aucun synthé ni effet hébergé,
-aucun Max for Live nécessaire. Le VST3 reste un instrument silencieux sur sa
-propre piste MIDI ; les instruments, effets et pistes de notes restent dans Live.
+Cette base repart de l'archive ANKS_Curve_Pilot_V2_1_VST3_et_Autonome_Sources.zip
+fournie par l'utilisateur. Les précédentes tentatives Mini ne servent pas de base.
 
-## Nouveautés 0.2
+## Ce qui vient du programme d'origine
 
-Chaque ligne possède une activation, une sortie MIDI (ou la sortie globale),
-un canal 1–16 et un CC 0–127. Exemples pour une groovebox à quatre parties :
+Curve.h et MotionLanguage.h sont repris sans modification. Le thème, les couleurs
+par ligne, le dessin libre et l'éditeur de points sont ceux de la V2.1. Les outils
+copier/coller, annulation, verrouillage, inversion, variation, lissage du dessin,
+phase, profondeur, minimum/maximum, longueur et description locale sont conservés.
+Les paramètres de lecture originaux gardent leurs identifiants laneN_on/min/max/
+bars/offset/smooth/depth. L'annulation ne restaure plus une ancienne destination.
 
-| Ligne Mini | Sortie | Canal | CC |
-| --- | --- | --- | --- |
-| 1 | Groovebox USB | 1 | 70 |
-| 2 | Groovebox USB | 1 | 71 |
-| 3 | Groovebox USB | 2 | 70 |
-| 4 | Groovebox USB | 3 | 73 |
+## Interface native du plugin
 
-Le canal est celui de la partie configurée dans la machine, pas le numéro de
-piste Ableton. Vérifier les numéros dans l'implémentation MIDI de la machine.
-On peut choisir une autre machine pour chaque ligne. Les sorties sont ouvertes
-une seule fois par instance, même si plusieurs lignes utilisent le même port.
+A gauche, les douze lignes, leurs noms et leurs destinations. Au centre, le
+même éditeur de courbes agrandi : dessin, points, formes et copier/coller. Les
+réglages de lecture courants restent visibles. Phase, profondeur, lissage,
+variation et outils avancés se déplient dans le même panneau, avec défilement.
+A droite, destination, commande manuelle et transfert vers un clip. Ce n'est
+pas une page web intégrée : l'interface est en C++/JUCE.
 
-Les anciennes sauvegardes Mini 0.1 retrouvent CC20–31, canal 1, courbes et
-réglages. Le code plugin Cpm1 et le tag XML CURVE_PILOT_MIDI_01 sont conservés.
-Les sessions des anciens Curve Pilot V1/V2/V2.1 hébergeant des instruments ne
-sont pas importées. Les deux projets restent distincts.
+## Ce qui est retiré
 
-## Installer le nouveau VST3
+Chargement et scan des plugins, rack d'instrument/effets, traitement tiers par
+sous-blocs de 32 échantillons, compensation dry/wet, buffers de délai, éditeurs
+VST enfants et son de test. Mini n'héberge aucun plugin et ne calcule aucun son.
+Le produit désactive JUCE_PLUGINHOST_VST3. Seul l'hôte indépendant des tests
+active ce module pour vérifier le fichier VST3 livré.
 
-Dans GitHub Actions, ouvrir le dernier build réussi, puis télécharger
-`Curve-Mini-Prototype-0.2-Windows-x64`. Dézipper. Ableton fermé, remplacer
-l'ancien dossier `Curve Mini Prototype 0.1.vst3` par le dossier COMPLET
-`Curve Mini Prototype 0.2.vst3` dans `C:\Program Files\Common Files\VST3`.
-Éviter de garder les deux versions installées avec le même identifiant plugin.
-Conserver une copie de l'ancienne version ailleurs si nécessaire.
+La déclaration audio stéréo d'entrée/sortie et l'entrée MIDI de la V2.1 sont
+conservées pour la compatibilité hôte. L'audio et les notes sont effacés ; placer
+Mini sur sa piste de contrôle, pas sur le trajet audio d'un instrument.
+Le callback publie uniquement le transport par atomiques. Courbes et émissions
+CC sont évaluées par un timer du processeur à 100 Hz maximum, hors callback.
+Le lissage temporel original est adapté à cette fréquence de contrôle. Fenêtre
+fermée, le timer continue. Aucun bénéfice CPU chiffré n'est promis sans mesure.
 
-Le workflow Windows se lance désormais automatiquement après une modification
-du code sur main ; son lancement manuel reste disponible.
+## Macros Ableton
 
-## Premier essai : une ligne vers une machine
+Choisir une ligne, nommer sa destination et sélectionner Macro / paramètre
+Ableton. Créer un port loopMIDI, le sélectionner comme sortie de cette ligne.
+Dans Live : entrée du port Remote ON, Track OFF, Sync OFF ; sortie tout OFF.
+Connecter dans Mini. Ctrl+M dans Live : sélectionner une macro, puis Assigner
+dans Live dans Mini. Seul le CC de cette ligne est envoyé à 64, ENVOI est coupé.
+Quitter Ctrl+M, activer la ligne et ENVOI. La courbe suit la lecture de Live.
+Le canal par défaut est 16, CC20 à 31, pour distinguer ces adresses des
+contrôleurs physiques courants sur canal1. Eviter les collisions d'assignation.
+Max for Live n'est pas requis ; instruments et effets restent dans Ableton.
 
-1. Garder les pistes de notes habituelles dans Live. Ajouter Mini sur une autre
-   piste MIDI.
-2. Dans Mini, choisir la sortie USB de la machine comme sortie globale. Sur la
-   ligne 1, garder « Sortie globale », choisir le canal de la partie et son CC.
-3. Cliquer Connecter, activer la ligne 1, puis ENVOI ON.
-4. Tourner « Manuel 0-127 ». La ligne passe en MANUEL et envoie cette valeur,
-   même lorsque Live est à l'arrêt.
-5. Cliquer MANUEL pour revenir à COURBE, choisir une forme ou dessiner, puis
-   lancer Live. La courbe commande le même CC.
-6. Ajouter la ligne 2 avec un autre CC ou canal et refaire le test.
+## Machines physiques USB
 
-ENVOI OFF arrête tous les messages automatiques et manuels. Activer une ligne
-ne suffit pas : ENVOI doit aussi être ON. Modifier son adresse arrête ENVOI
-pour permettre de vérifier la destination. Modifier un port exige aussi de
-recliquer Connecter. Deux lignes actives ne peuvent pas partager le même
-port/canal/CC ; ENVOI est refusé ou arrêté pour éviter leurs commandes concurrentes.
-L'arrêt du transport arrête les courbes ; le mode MANUEL reste volontairement
-utilisable à l'arrêt. Assigner Live est une émission ponctuelle distincte.
+Choisir Machine MIDI, sortie, canal et CC par ligne. Exemple : ligne1 canal1/CC70,
+ligne2 canal1/CC71, ligne3 canal2/CC70, ligne4 canal3/CC73. Les canaux doivent
+correspondre aux parties de la machine. Plusieurs machines peuvent être choisies.
+Connecter ouvre une seule fois chaque port. Si Windows refuse le partage de la
+sortie USB déjà ouverte par Live, passer par loopMIDI et une piste relais Live :
+entrée Track ON / Remote OFF, Monitor In, sortie vers la machine au bon canal.
+Les pistes de notes existantes restent indépendantes. Deux lignes actives ne
+peuvent pas partager le même port/canal/CC : ENVOI s'arrête pour éviter le conflit.
 
-### Si la sortie USB ne peut pas être ouverte
+## Potards MIDI externes
 
-Certains pilotes Windows ne permettent pas à Mini et Live d'ouvrir la même
-sortie simultanément. Ne pas modifier les pistes de notes pour contourner cela.
-Créer plutôt un port loopMIDI, par exemple `CurveMini Materiel`, et le choisir
-dans Mini. Dans Live, activer **Track/Piste** pour l'entrée de ce port et laisser
-**Remote/Télécommande** et **Sync** OFF. Laisser sa sortie dans Live désactivée.
+Dans Live, activer Remote pour l'entrée du contrôleur physique. Configure sur
+Mini : déplacer son curseur manuel, puis quitter Configure. Ctrl+M : sélectionner
+le paramètre Ligne N Valeur MIDI, tourner le potard physique, quitter Ctrl+M.
+Sa valeur prend la main sur la courbe de cette seule ligne. Reprendre la courbe
+rend la main au dessin. Le manuel est absolu 0-127 et fonctionne à l'arrêt,
+avec ligne active et ENVOI ON. ENVOI OFF coupe courbes et manuel. Les gestes ne
+sont pas redessinés dans la courbe ; ils sont automatisables dans Live.
 
-Créer une piste relais MIDI : entrée `CurveMini Materiel` sur le canal de la
-partie, Monitor **In**, sortie vers la machine et canal correspondant. Une piste
-relais par canal permet de conserver les destinations des différentes parties.
-Live ouvre alors la sortie USB et relaie les CC de Mini. Ne pas renvoyer cette
-piste vers le port loopMIDI d'entrée. Ce routage matériel diffère du mode macros
-ci-dessous ; ne pas confondre Track et Remote.
+## Courbe vers clip
 
-## Assigner un contrôleur physique aux potards de Mini
+Exporter courbe MIDI écrit un tour en SMF sans notes, avec canal/CC,
+minimum/maximum, profondeur, phase et lissage (calculé au tempo d'export).
+Importer le .mid dans un clip MIDI vide de Live, sélectionner MIDI Ctrl et le CC,
+puis régler le canal/sortie de la piste. Désactiver l'émission Mini correspondante.
+Pas de collage direct propriétaire dans Live ni de fusion automatique avec des
+notes existantes. La durée utilise la dernière signature publiée par Live, ou
+4/4 en autonome. CC0/32 et CC120-127 ont des rôles particuliers dans MIDI/Live.
+L'import réel dans Live reste à essayer sur le poste utilisateur.
 
-Mini expose 12 paramètres VST3 : `Ligne 1 Valeur` à `Ligne 12 Valeur` (0–127).
-L'entrée physique est gérée par Live ; Mini n'ouvre pas le port du contrôleur
-et n'utilise pas ses CC bruts pour les assignations. Le VST3 expose néanmoins
-une entrée MIDI d'instrument pour la compatibilité hôte ; les événements reçus
-sont ignorés et ne sont pas retransmis à la machine.
+## Sauvegarde et reprise des courbes V2.1
 
-1. Dans les réglages MIDI de Live, activer Remote/Télécommande pour l'entrée
-   du contrôleur physique.
-2. Dans le panneau du plugin Mini dans Live, ouvrir **Configure**, puis bouger
-   le potard « Manuel 0-127 » de la ligne voulue. Quitter Configure.
-3. Activer l'assignation MIDI de Live (Ctrl+M), sélectionner le paramètre exposé
-   `Ligne N Valeur`, tourner le potard physique, puis quitter Ctrl+M.
-4. Dans Mini, connecter la destination, activer la ligne et ENVOI. Le potard
-   physique commande désormais le CC/canal de cette ligne.
+Exporter/Importer session conserve courbes, points, textes, paramètres et
+routages. A la restauration, sorties fermées, ENVOI OFF ; reconnecter explicitement.
+L'import d'un fichier .curvepilot V2.1 récupère les courbes et leurs réglages,
+sans charger les instruments/effets ni conserver leurs correspondances internes.
+Les lignes importées sont désactivées : choisir leurs nouvelles destinations.
+Les états des précédentes tentatives Mini rejetées ne sont pas la référence.
+Le code plugin Cpm1 distingue Mini de Curve Pilot Cvp2 ; éviter les doublons de
+Mini installés sous plusieurs noms. Nom du nouveau bundle : Curve Mini.vst3.
 
-Le CC d'entrée du contrôleur peut être différent du CC de sortie. Exemple :
-CC21 de votre contrôleur -> Ligne 1 Valeur de Mini -> CC74/canal 2 de la machine.
-Un rack contenant Mini peut aussi mapper ses macros à ces paramètres.
+## Vérification
 
-Tourner le potard (souris, contrôleur ou automation de Live) prend la main sur
-la courbe de cette ligne. Les autres lignes continuent. Cliquer MANUEL pour
-reprendre la courbe. Le changement de valeur prend la main ; renvoyer une valeur
-identique n'est pas un nouveau mouvement. La reprise peut provoquer un saut de
-valeur : pas de système de rattrapage ou de fondu dans ce prototype.
-
-Le potard manuel donne la valeur CC absolue, de 0 à 127 ; minimum/maximum ne
-s'appliquent qu'à la courbe. Le potard ne suit pas visuellement la courbe :
-« Valeur » affiche le dernier message envoyé. Les gestes peuvent être enregistrés
-comme automation de ce paramètre dans Live, mais ne sont pas redessinés dans Mini.
-
-En autonome, les potards fonctionnent à la souris ; cette version n'a pas
-l'assignation MIDI de Live et ne possède pas d'apprentissage d'entrée propre.
-
-## Exporter une courbe dans un clip Live
-
-1. Régler la courbe, minimum/maximum, longueur, canal et CC de la ligne.
-2. Cliquer **Exporter MIDI** puis enregistrer le `.mid`.
-3. Déposer ce fichier dans un emplacement de clip MIDI vide dans Live.
-4. Dans les enveloppes du clip, choisir **MIDI Ctrl**, puis le CC exporté.
-   Régler la sortie de la piste et son canal vers la machine.
-5. Désactiver la ligne de Mini qui envoyait ce CC pour éviter un double pilotage.
-
-Le fichier contient un tour de la courbe et aucun événement de note. Il ne
-fusionne pas automatiquement avec un clip de notes existant. Pour conserver
-vos notes, importer d'abord dans un clip séparé, puis utiliser les commandes
-d'édition d'enveloppe de Live pour transférer l'enveloppe si nécessaire.
-
-Export SMF0 à 960 ticks/noire, un échantillon tous les 10 ticks (1/96 de noire),
-valeurs 7 bits dédoublonnées, fin de piste à la longueur exacte. Aucun changement
-de tempo n'est imposé. Le VST3 utilise la dernière signature rythmique publiée
-par Live ; à défaut et en autonome, 4/4. Les exports ne contiennent pas les
-gestes manuels ni les sauts de lecture. L'import réel dans votre Live reste à tester.
-Les CC120–127 sont des commandes de mode de canal ; Live expose surtout les CC
-jusqu'à 119 dans ses enveloppes. CC0/32 ont un rôle particulier de sélection de banque.
-
-La documentation Live 12 confirme l'import des contrôleurs en enveloppes :
-[Ableton — enveloppes de contrôleurs MIDI](https://www.ableton.com/en/manual/clip-envelopes/#midi-controller-clip-envelopes).
-Cela confirme le principe du transfert par fichier, pas encore son essai sur
-votre poste ni un copier-coller direct depuis la fenêtre du plugin.
-
-## Conserver le mode macros de VST dans Ableton
-
-Créer un port loopMIDI `CurveMini Macros`. Dans Live, pour son entrée : Remote
-ON, Track OFF, Sync OFF ; pour sa sortie : tout OFF. Mini ouvre directement
-la sortie système de ce port.
-
-Dans Mini, sélectionner ce port et Connecter. Dans Ctrl+M de Live, sélectionner
-une macro cible puis cliquer **Assigner Live** sur la ligne. Un seul CC est
-émis à 64/127, ce qui peut placer la macro à mi-course ; ENVOI est coupé. Quitter
-Ctrl+M puis réactiver ENVOI. Ne pas utiliser cette opération pour « apprendre »
-les paramètres fixes d'une groovebox : y choisir simplement leur canal et CC.
-
-Les correspondances du contrôleur physique et des macros sont conservées dans
-le set Live. Les courbes, sorties, adresses, modes et valeurs manuelles sont
-conservés dans l'état Mini. Après restauration, ENVOI est OFF et toutes les
-sorties sont fermées : vérifier les ports, Connecter puis ENVOI.
-
-## Limites et validation
-
-Émission sur le fil messages, au maximum 100 Hz par ligne, sans renvoi des
-valeurs inchangées. L'USB et Live ajoutent leur propre délai. Aucun pilote MIDI,
-verrou d'interface ou instrument hébergé dans le callback audio. MIDI 7 bits,
-pas de précision audio ni de haute résolution. Le timer continue fenêtre fermée.
-Un pilote débranché ne fournit pas nécessairement d'erreur lors de l'envoi :
-le statut connecté ne garantit pas la réception. Vérifier et reconnecter.
-
-Le modèle MIDI et l'encodeur SMF sont testés localement. Le workflow Windows
-compile les deux formats et exécute aussi les tests du processeur, de ses
-paramètres et de la migration des sauvegardes. Les résultats de cette évolution
-sont consignés dans REPRISE.md. Seul un essai utilisateur peut confirmer
-l'assignation physique, les ports USB/loopMIDI, l'import dans Live, la charge et
-la lisibilité à votre mise à l'échelle Windows.
-
-## Correctif de chargement 0.2.1
-
-Le paquet `Curve-Mini-Prototype-0.2.1-Windows-x64` remplace le précédent.
-Le nom du dossier reste `Curve Mini Prototype 0.2.vst3` : remplacer ce dossier
-complet, Ableton fermé. Le code Cpm1 et les identifiants de paramètres restent
-inchangés. La fenêtre affiche désormais 0.2.1.
-
-La déclaration d'instrument possède maintenant un bus MIDI entrant et la
-catégorie Instrument/Synth. Les notes et CC entrants sont consommés sans son
-ni retransmission ; les potards restent assignés par Live. Le moteur Microsoft
-C/C++ est intégré au binaire pour ne pas exiger son installation séparée.
-
-Le workflow teste maintenant le VST3 compilé avec un hôte Windows indépendant :
-chargement de la DLL, création d'instance, ouverture/fermeture de la fenêtre native,
-traitement silencieux et restauration d'état. Il inspecte aussi l'architecture,
-les exports de la DLL et ses dépendances. Voir docs/CHARGEMENT_0_2_1.md.
-Ces tests ne remplacent pas un essai dans Ableton Live.
+Tests locaux des courbes et du langage local : réussis. Le workflow Windows
+vérifie le processeur, l'interface native, la sauvegarde, le MIDI exporté et le
+chargement du VST3 réel par un hôte indépendant. Un PNG de l'interface C++ est
+produit par les tests. Le résultat dans Live et la charge doivent être mesurés
+sur le poste utilisateur. Les anciens documents V2.1 sont archivés sous docs/.
