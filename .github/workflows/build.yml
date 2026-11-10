@@ -1,4 +1,4 @@
-name: Curve Mini Prototype 0.2 Windows
+name: Curve Mini Prototype 0.2.1 Windows
 on:
   workflow_dispatch:
   push:
@@ -6,12 +6,14 @@ on:
     paths:
       - 'Source/**'
       - 'tests/**'
+      - 'tools/**'
       - 'CMakeLists.txt'
       - '.github/workflows/build.yml'
   pull_request:
     paths:
       - 'Source/**'
       - 'tests/**'
+      - 'tools/**'
       - 'CMakeLists.txt'
       - '.github/workflows/build.yml'
 permissions:
@@ -29,12 +31,32 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           ctest --test-dir build -C Release -R midi_model --output-on-failure
       - name: Compiler le VST3, l autonome et les tests du plugin
-        run: cmake --build build --config Release --target CurvePilotMidi01_VST3 CurvePilotMidi01_Standalone plugin_tests --parallel 2
-      - name: Tester les sauvegardes, les potards et le transport
+        run: cmake --build build --config Release --target CurvePilotMidi01_VST3 CurvePilotMidi01_Standalone plugin_tests vst3_load_tests --parallel 2
+      - name: Verifier le module Windows livre et ses dependances
+        shell: pwsh
+        run: ./tools/check-vst3.ps1 -Bundle 'build/CurvePilotMidi01_artefacts/Release/VST3/Curve Mini Prototype 0.2.vst3'
+      - name: Tester les sauvegardes, les potards et le chargement VST3
         run: ctest --test-dir build -C Release --output-on-failure
-      - uses: actions/upload-artifact@v4
+      - name: Telecharger le precedent paquet pour diagnostic comparatif
+        uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           name: Curve-Mini-Prototype-0.2-Windows-x64
+          run-id: 42853157169
+          github-token: ${{ github.token }}
+          path: previous-package
+      - name: Inspecter le precedent VST3 (diagnostic uniquement)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $bundle = Get-ChildItem previous-package -Recurse -Directory -Filter '*.vst3' | Select-Object -First 1
+          if (!$bundle) { throw 'Previous VST3 bundle absent' }
+          ./tools/check-vst3.ps1 -Bundle $bundle.FullName -AllowSharedRuntime
+          & 'build/vst3_load_tests_artefacts/Release/Curve Mini VST3 Load Test.exe' $bundle.FullName --legacy-diagnostic
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Curve-Mini-Prototype-0.2.1-Windows-x64
           path: |
             build/CurvePilotMidi01_artefacts/Release/VST3/
             build/CurvePilotMidi01_artefacts/Release/Standalone/

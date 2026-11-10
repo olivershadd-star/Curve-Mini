@@ -123,7 +123,7 @@ struct Editor:AudioProcessorEditor,private Timer {
     Viewport view;Component stack;std::vector<std::unique_ptr<Row>> rows;Array<MidiDeviceInfo> devices;String shownPort;
     TooltipWindow tips{this,700};
     Editor(Pilot& processor):AudioProcessorEditor(processor),p(processor){
-        title.setText("CURVE MINI  /  PROTOTYPE 0.2",dontSendNotification);title.setColour(Label::textColourId,accent(0));addAndMakeVisible(title);
+        title.setText("CURVE MINI  /  PROTOTYPE 0.2.1",dontSendNotification);title.setColour(Label::textColourId,accent(0));addAndMakeVisible(title);
         hint.setText("Sortie globale ou par ligne | Canal + CC libres | Potards assignables dans Live | Export .mid",dontSendNotification);
         hint.setColour(Label::textColourId,muted);addAndMakeVisible(hint);
         for(auto* c:std::initializer_list<Component*>{&ports,&refresh,&connectButton,&send,&tempo,&status,&view})addAndMakeVisible(c);

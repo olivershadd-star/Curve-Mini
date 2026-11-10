@@ -11,8 +11,9 @@ public:
     void processBlock(juce::AudioBuffer<float>&,juce::MidiBuffer&)override;
     bool isBusesLayoutSupported(const BusesLayout& b)const override{return b.getMainOutputChannelSet()==juce::AudioChannelSet::stereo();}
     // Physical controllers are mapped by Live to our host parameters (Remote).
-    // No raw MIDI driver or parameter locks in processBlock.
-    bool acceptsMidi()const override{return false;}
+    // Expose a MIDI event input as expected of a VST3 instrument. Incoming
+    // notes/CC are consumed, not forwarded; assignments still belong to Live.
+    bool acceptsMidi()const override{return true;}
     bool producesMidi()const override{return false;}
     double getTailLengthSeconds()const override{return 0;}
     bool hasEditor()const override{return true;}

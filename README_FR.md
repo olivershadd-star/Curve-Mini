@@ -79,7 +79,9 @@ ci-dessous ; ne pas confondre Track et Remote.
 
 Mini expose 12 paramètres VST3 : `Ligne 1 Valeur` à `Ligne 12 Valeur` (0–127).
 L'entrée physique est gérée par Live ; Mini n'ouvre pas le port du contrôleur
-et ne reçoit pas ses CC bruts sur le bus MIDI du VST3.
+et n'utilise pas ses CC bruts pour les assignations. Le VST3 expose néanmoins
+une entrée MIDI d'instrument pour la compatibilité hôte ; les événements reçus
+sont ignorés et ne sont pas retransmis à la machine.
 
 1. Dans les réglages MIDI de Live, activer Remote/Télécommande pour l'entrée
    du contrôleur physique.
@@ -167,3 +169,21 @@ paramètres et de la migration des sauvegardes. Les résultats de cette évoluti
 sont consignés dans REPRISE.md. Seul un essai utilisateur peut confirmer
 l'assignation physique, les ports USB/loopMIDI, l'import dans Live, la charge et
 la lisibilité à votre mise à l'échelle Windows.
+
+## Correctif de chargement 0.2.1
+
+Le paquet `Curve-Mini-Prototype-0.2.1-Windows-x64` remplace le précédent.
+Le nom du dossier reste `Curve Mini Prototype 0.2.vst3` : remplacer ce dossier
+complet, Ableton fermé. Le code Cpm1 et les identifiants de paramètres restent
+inchangés. La fenêtre affiche désormais 0.2.1.
+
+La déclaration d'instrument possède maintenant un bus MIDI entrant et la
+catégorie Instrument/Synth. Les notes et CC entrants sont consommés sans son
+ni retransmission ; les potards restent assignés par Live. Le moteur Microsoft
+C/C++ est intégré au binaire pour ne pas exiger son installation séparée.
+
+Le workflow teste maintenant le VST3 compilé avec un hôte Windows indépendant :
+chargement de la DLL, création d'instance, ouverture/fermeture de la fenêtre native,
+traitement silencieux et restauration d'état. Il inspecte aussi l'architecture,
+les exports de la DLL et ses dépendances. Voir docs/CHARGEMENT_0_2_1.md.
+Ces tests ne remplacent pas un essai dans Ableton Live.

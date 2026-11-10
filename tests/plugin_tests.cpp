@@ -21,7 +21,7 @@ static juce::MemoryBlock binary(const juce::XmlElement& xml){juce::MemoryBlock b
 int main(){
     juce::ScopedJuceInitialiser_GUI init;
     Pilot p;
-    assert(p.getParameters().size()==12);
+    assert(p.getParameters().size()==12&&p.acceptsMidi()&&!p.producesMidi());
     for(int i=0;i<pilot::lanes;++i){assert(p.manualValue(i)==64&&p.lanes[(size_t)i].cc==20+i);}
     setValue(p,0,95);PilotTestAccess::tick(p);assert(p.isManual(0)&&!p.isManual(1)&&p.manualValue(0)==95);
     p.useCurve(0,true);PilotTestAccess::tick(p);assert(!p.isManual(0));
@@ -46,8 +46,8 @@ int main(){
     assert(restored.lanes[0].channel==16&&restored.lanes[0].cc==0&&restored.lanes[0].bars==.25&&restored.lanes[0].minimum==1&&restored.lanes[0].maximum==0);
     const char invalid[]="not a preset";restored.setStateInformation(invalid,sizeof(invalid));assert(restored.lanes[0].channel==16);
     Transport transport;transport.position.setIsPlaying(true);transport.position.setPpqPosition(8.0);transport.position.setBpm(120.0);
-    p.setPlayHead(&transport);juce::AudioBuffer<float> audio(2,64);audio.clear();audio.setSample(0,0,1);juce::MidiBuffer midi;
-    p.processBlock(audio,midi);assert(PilotTestAccess::playing(p)&&PilotTestAccess::position(p)==8&&audio.getSample(0,0)==0);
+    p.setPlayHead(&transport);juce::AudioBuffer<float> audio(2,64);audio.clear();audio.setSample(0,0,1);juce::MidiBuffer midi;midi.addEvent(juce::MidiMessage::noteOn(1,60,(juce::uint8)100),0);
+    p.processBlock(audio,midi);assert(PilotTestAccess::playing(p)&&PilotTestAccess::position(p)==8&&audio.getSample(0,0)==0&&midi.isEmpty());
     transport.position.setPpqPosition(0.0);p.processBlock(audio,midi);assert(PilotTestAccess::position(p)==0);
     transport.position=juce::AudioPlayHead::PositionInfo{};transport.position.setIsPlaying(true);
     p.processBlock(audio,midi);assert(!PilotTestAccess::playing(p)); // No stale PPQ reuse.
