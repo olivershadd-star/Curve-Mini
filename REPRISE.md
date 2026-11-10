@@ -26,7 +26,7 @@ Tests d'intégration ajoutés au workflow Windows : paramètres réels APVTS,
 prise de main par ligne, sauvegarde avant consommation du mouvement, restauration
 des modes et valeurs, réouverture de l'éditeur, anciens états et entrées hors
 bornes, transport manquant / saut de boucle, relecture du fichier MIDI par JUCE.
-La compilation et ces tests Windows sont à confirmer par le build de ce commit.
+Compilation Windows x64 réussie le 10 novembre 2026 sur le commit\n74117bd4ff2f3136d40cf28ffca19ed4b484003d. Les deux tests CTest (midi_model et\nplugin_state) ont réussi. Le VST3 et l'autonome ont été produits et publiés en\nartefact Curve-Mini-Prototype-0.2-Windows-x64.\n\n[Build Windows réussi](https://github.com/olivershadd-star/Curve-Mini/actions/runs/42853157169).\nCe résultat ne valide pas encore l'intégration matérielle ni Live sur le poste utilisateur.
 
 Aucun essai utilisateur de cette évolution dans Live ni sur groovebox n'a encore
 été fait. L'import des CC est documenté par Ableton, mais doit être essayé avec
