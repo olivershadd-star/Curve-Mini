@@ -108,14 +108,14 @@ public:
         shape.addItemList({"Vague","Rampe +","Rampe -","Triangle","Douce","Paliers"},1);shape.setTextWhenNothingSelected("Choisir une forme...");shape.onChange=[this]{if(shape.getSelectedId()>0){p.replaceCurve(selected,curve::preset(shape.getSelectedId()-1,p.get(selected,"bars")));shape.setSelectedId(0,dontSendNotification);sync();}};
         const char* titles[]={"Minimum %","Maximum %","Mesures","Phase %","Lissage ms","Profondeur %","Variation %","Lisser dessin %"};
         for(int k=0;k<8;++k){editBody.addAndMakeVisible(sliders[(size_t)k]);editBody.addAndMakeVisible(labels[(size_t)k]);label(labels[(size_t)k],titles[k],12);auto& s=sliders[(size_t)k];s.setSliderStyle(Slider::LinearHorizontal);s.setTextBoxStyle(Slider::TextBoxRight,false,50,24);if(k>=6){s.setRange(0,100,1);s.setValue(k==6?5:30);}}
-        advanced.onClick=[this]{expanded=!expanded;resized();};
+        advanced.onClick=[this]{expanded=!expanded;advanced.setButtonText(expanded?"Masquer les reglages avances":"Reglages avances");resized();};
         invert.onClick=[this]{auto l=p.getLane(selected);l.curve.bars=p.get(selected,"bars");for(auto& y:l.curve.y)y=1-y;p.replaceCurve(selected,l.curve);sync();};
         vary.onClick=[this]{p.applyVariation(selected,(float)sliders[6].getValue()*.01f);sync();};smooth.onClick=[this]{p.smoothCurve(selected,(float)sliders[7].getValue()*.01f);sync();};
-        describe.onClick=[this]{DialogWindow::LaunchOptions options;options.content.setOwned(new MotionPanel(p,selected));options.dialogTitle="Decrire / Code — ligne "+String(selected+1);options.dialogBackgroundColour=surface;options.useNativeTitleBar=true;options.resizable=true;if(motionWindow){motionWindow->toFront(true);return;}motionWindow=options.launchAsync();};
+        describe.onClick=[this]{DialogWindow::LaunchOptions options;auto* panel=new MotionPanel(p,selected);panel->setLookAndFeel(&theme);options.content.setOwned(panel);options.dialogTitle="Decrire / Code — ligne "+String(selected+1);options.dialogBackgroundColour=surface;options.useNativeTitleBar=true;options.resizable=true;if(motionWindow){motionWindow->toFront(true);return;}motionWindow=options.launchAsync();};
         assign.onClick=[this]{p.assign(selected);};resume.onClick=[this]{p.resumeCurve(selected);sync();};midiExport.onClick=[this]{fileDialog(0);};save.onClick=[this]{fileDialog(1);};load.onClick=[this]{fileDialog(2);};
         bpm.setRange(20,300,.1);bpm.setValue(p.standaloneBpm.load());bpm.setSliderStyle(Slider::LinearHorizontal);bpm.setTextBoxStyle(Slider::TextBoxRight,false,65,24);bpm.setTextValueSuffix(" BPM");bpm.onValueChange=[this]{p.standaloneBpm=bpm.getValue();};play.onClick=[this]{p.standalonePlaying=!p.standalonePlaying.load();};stop.onClick=[this]{p.standalonePlaying=false;p.transportReset=true;};
         bool standalone=JUCEApplicationBase::isStandaloneApp();play.setVisible(standalone);stop.setVisible(standalone);bpm.setVisible(standalone);
-        setResizable(true,true);setResizeLimits(900,620,3200,2200);setSize(p.editorWidth,p.editorHeight);scan();list.selectRow(selected);select(selected);startTimerHz(15);
+        setResizable(true,true);setResizeLimits(820,560,3200,2200);setSize(p.editorWidth,p.editorHeight);scan();list.selectRow(selected);select(selected);startTimerHz(15);
     }
     ~Editor()override{stopTimer();if(motionWindow)delete motionWindow.getComponent();{const ScopedLock guard(p.mutex);p.editorWidth=getWidth();p.editorHeight=getHeight();p.selectedLaneUI=selected;}editViewport.setViewedComponent(nullptr,false);routeViewport.setViewedComponent(nullptr,false);setLookAndFeel(nullptr);}
     int getNumRows()override{return CurvePilot::laneCount;}
@@ -135,7 +135,7 @@ public:
     }
     void scan(){devices=MidiOutput::getAvailableDevices();sync();}
     void sync(){
-        syncing=true;auto l=p.getLane(selected);label(heading,String(selected+1).paddedLeft('0',2)+"  /  "+l.name,21,ink);
+        syncing=true;for(auto& slider:sliders)slider.setColour(Slider::thumbColourId,laneColour(selected));manual.setColour(Slider::thumbColourId,laneColour(selected));active.setColour(ToggleButton::tickColourId,laneColour(selected));auto l=p.getLane(selected);label(heading,String(selected+1).paddedLeft('0',2)+"  /  "+l.name,21,ink);
         if(!name.hasKeyboardFocus(true))name.setText(l.name,false);destination.setSelectedId(l.hardware?2:1,dontSendNotification);channel.setSelectedId(l.channel,dontSendNotification);cc.setValue(l.cc,dontSendNotification);
         ports.clear(dontSendNotification);ports.addItem("Choisir une sortie...",1);int choice=l.port.isEmpty()?1:0;for(int i=0;i<devices.size();++i){ports.addItem(devices[i].name,i+2);if(devices[i].identifier==l.port)choice=i+2;}if(choice==0){ports.addItem("Indisponible : "+l.port,10000);choice=10000;}ports.setSelectedId(choice,dontSendNotification);
         free.setToggleState(!l.pointMode,dontSendNotification);point.setToggleState(l.pointMode,dontSendNotification);lock.setButtonText(l.locked?"Deverrouiller":"Verrouiller");
@@ -159,20 +159,20 @@ public:
         const ScopedLock guard(p.mutex);status.setText(p.status,dontSendNotification);status.setTooltip(p.status);send.setButtonText(p.sending?"ENVOI ON":"ENVOI OFF");send.setColour(TextButton::buttonColourId,p.sending?Colour(0xff186856):Colour(0xff28354b));
         bool manualMode=p.isManual(selected);resume.setEnabled(manualMode);manualLabel.setText(manualMode?"MANUEL / COURBE SUSPENDUE":"COMMANDE MANUELLE / 0-127",dontSendNotification);play.setButtonText(p.standalonePlaying?"Pause":"Lecture");
     }
-    void paint(Graphics& g)override{g.fillAll(bg);g.setColour(edge);g.drawHorizontalLine(82,20,(float)getWidth()-20);g.drawVerticalLine(214,98,(float)getHeight()-45);}
+    void paint(Graphics& g)override{g.fillAll(bg);g.setColour(edge);g.drawHorizontalLine(82,20,(float)getWidth()-20);g.drawVerticalLine(list.getRight()+10,98,(float)getHeight()-45);g.setColour(surface.withAlpha(.45f));g.fillRoundedRectangle(routeViewport.getBounds().toFloat(),10);}
     void resized()override{
         auto r=getLocalBounds().reduced(20);auto header=r.removeFromTop(50);title.setBounds(header.removeFromLeft(180));load.setBounds(header.removeFromRight(130).reduced(3,8));save.setBounds(header.removeFromRight(130).reduced(3,8));send.setBounds(header.removeFromRight(108).reduced(3,8));connect.setBounds(header.removeFromRight(108).reduced(3,8));subtitle.setBounds(header);
         r.removeFromTop(22);status.setBounds(r.removeFromBottom(26));auto transport=r.removeFromBottom(JUCEApplicationBase::isStandaloneApp()?34:0);play.setBounds(transport.removeFromLeft(95));stop.setBounds(transport.removeFromLeft(110));bpm.setBounds(transport.removeFromLeft(220));
-        list.setBounds(r.removeFromLeft(185));r.removeFromLeft(20);auto right=r.removeFromRight(265);routeViewport.setBounds(right);r.removeFromRight(18);editViewport.setBounds(r);
+        list.setBounds(r.removeFromLeft(getWidth()<1100?150:185));r.removeFromLeft(20);auto right=r.removeFromRight(getWidth()<1100?245:265);routeViewport.setBounds(right);r.removeFromRight(18);editViewport.setBounds(r);
         const int w=jmax(320,editViewport.getMaximumVisibleWidth());editBody.setSize(w,expanded?910:650);auto e=editBody.getLocalBounds().reduced(6);auto head=e.removeFromTop(44);active.setBounds(head.removeFromRight(115));heading.setBounds(head);
         e.removeFromTop(16);auto modes=e.removeFromTop(30);free.setBounds(modes.removeFromLeft(100));modes.removeFromLeft(5);point.setBounds(modes.removeFromLeft(72));modes.removeFromLeft(12);shape.setBounds(modes);
         e.removeFromTop(10);auto tools=e.removeFromTop(28);for(auto* button:{&copy,&paste,&undo,&lock}){button->setBounds(tools.removeFromLeft((w-26)/4).reduced(2,0));}
         e.removeFromTop(18);graph.setBounds(e.removeFromTop(300));e.removeFromTop(22);auto primary=e.removeFromTop(62);int col=primary.getWidth()/3;for(int k=0;k<3;++k){auto area=primary.removeFromLeft(col);labels[(size_t)k].setBounds(area.removeFromTop(20));sliders[(size_t)k].setBounds(area.reduced(2,0));}
-        e.removeFromTop(18);advanced.setBounds(e.removeFromTop(30));e.removeFromTop(14);
+        e.removeFromTop(18);auto advancedRow=e.removeFromTop(30);describe.setBounds(advancedRow.removeFromRight(125).reduced(2,0));advanced.setBounds(advancedRow.reduced(2,0));e.removeFromTop(14);
         for(int k=3;k<8;++k){labels[(size_t)k].setVisible(expanded);sliders[(size_t)k].setVisible(expanded);}
         if(expanded)for(int row=0;row<3;++row){auto band=e.removeFromTop(61);for(int x=0;x<2;++x){int k=3+row*2+x;if(k>=8)break;auto area=band.removeFromLeft((w-12)/2);labels[(size_t)k].setBounds(area.removeFromTop(19));sliders[(size_t)k].setBounds(area.reduced(2,0));}}
-        auto actions=e.removeFromTop(34);for(auto* button:{&invert,&vary,&smooth,&describe}){button->setVisible(expanded);if(expanded)button->setBounds(actions.removeFromLeft((w-12)/4).reduced(2,0));}
-        routeBody.setSize(jmax(245,routeViewport.getMaximumVisibleWidth()),800);auto d=routeBody.getLocalBounds().reduced(12,4);routeHeading.setBounds(d.removeFromTop(30));d.removeFromTop(12);
+        auto actions=e.removeFromTop(34);for(auto* button:{&invert,&vary,&smooth}){button->setVisible(expanded);if(expanded)button->setBounds(actions.removeFromLeft((w-12)/3).reduced(2,0));}
+        routeBody.setSize(jmax(200,routeViewport.getMaximumVisibleWidth()),800);auto d=routeBody.getLocalBounds().reduced(12,4);routeHeading.setBounds(d.removeFromTop(30));d.removeFromTop(12);
         auto field=[&](Label& lab,Component& control){lab.setBounds(d.removeFromTop(22));control.setBounds(d.removeFromTop(32));d.removeFromTop(14);};field(modeLabel,destination);field(nameLabel,name);field(portLabel,ports);
         refreshPorts.setBounds(d.removeFromTop(28));d.removeFromTop(15);auto addresses=d.removeFromTop(58);auto ch=addresses.removeFromLeft(addresses.getWidth()/2-5);addresses.removeFromLeft(10);channelLabel.setBounds(ch.removeFromTop(22));channel.setBounds(ch);ccLabel.setBounds(addresses.removeFromTop(22));cc.setBounds(addresses);
         routeHelp.setBounds(d.removeFromTop(78));assign.setBounds(d.removeFromTop(32));d.removeFromTop(24);manualLabel.setBounds(d.removeFromTop(36));manual.setBounds(d.removeFromTop(36));resume.setBounds(d.removeFromTop(32));manualHelp.setBounds(d.removeFromTop(92));d.removeFromTop(15);midiExport.setBounds(d.removeFromTop(36));
