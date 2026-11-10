@@ -25,7 +25,10 @@ jobs:
             build/CurveMini_artefacts/Release/VST3/
             build/CurveMini_artefacts/Release/Standalone/
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: Curve-Mini-interface-native
-          path: build/curve-mini-interface.png
+          path: |
+            build/curve-mini-interface.png
+            build/Testing/Temporary/LastTest.log
           if-no-files-found: error

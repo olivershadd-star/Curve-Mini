@@ -4,8 +4,10 @@ int main(int argc,char** argv){
     juce::ScopedJuceInitialiser_GUI init;
     if(argc!=2)return 2;
     juce::VST3PluginFormat format;juce::OwnedArray<juce::PluginDescription> descriptions;
-    format.findAllTypesForFile(descriptions,juce::String::fromUTF8(argv[1]));
-    if(descriptions.size()!=1||!descriptions[0]->isInstrument)return 3;
+    const auto bundle=juce::File::getCurrentWorkingDirectory().getChildFile(juce::String::fromUTF8(argv[1]));
+    std::cout<<"Loading bundle: "<<bundle.getFullPathName()<<std::endl;
+    format.findAllTypesForFile(descriptions,bundle.getFullPathName());
+    if(descriptions.size()!=1||!descriptions[0]->isInstrument){std::cerr<<"Expected one instrument; found "<<descriptions.size()<<std::endl;return 3;}
     juce::String error;auto plugin=format.createInstanceFromDescription(*descriptions[0],48000,256,error);
     if(!plugin||!plugin->acceptsMidi()||plugin->getParameters().size()<96){std::cerr<<error<<std::endl;return 4;}
     {std::unique_ptr<juce::AudioProcessorEditor> ui(plugin->createEditorIfNeeded());if(!ui)return 5;ui->addToDesktop(juce::ComponentPeer::windowIsTemporary);ui->setVisible(true);juce::MessageManager::getInstance()->runDispatchLoopUntil(80);ui->removeFromDesktop();}
