@@ -81,7 +81,7 @@ class Editor final:public AudioProcessorEditor,private Timer,private ListBoxMode
     TextButton assign{"Assigner dans Live"},resume{"Reprendre la courbe"},midiExport{"Exporter courbe MIDI"};
     std::array<std::unique_ptr<SA>,6> attachments;std::unique_ptr<SA> valueAttachment;std::unique_ptr<BA> activeAttachment;
     Component::SafePointer<DialogWindow> motionWindow;
-    std::unique_ptr<FileChooser> chooser;Array<MidiDeviceInfo> devices;int selected=0,seen=-1;bool syncing=false,expanded=false;
+    std::unique_ptr<FileChooser> chooser;Array<MidiDeviceInfo> devices;int selected=0,seen=-1;bool syncing=false,expanded=false,initialSizeChecked=false;
     std::array<Label,5> routeLabels;
     TextButton play{"Lecture"},stop{"Stop / debut"};Slider bpm;
 public:
@@ -118,6 +118,9 @@ public:
         setResizable(true,true);setResizeLimits(820,560,3200,2200);setSize(p.editorWidth,p.editorHeight);scan();list.selectRow(selected);select(selected);startTimerHz(15);
     }
     ~Editor()override{stopTimer();if(motionWindow)delete motionWindow.getComponent();{const ScopedLock guard(p.mutex);p.editorWidth=getWidth();p.editorHeight=getHeight();p.selectedLaneUI=selected;}editViewport.setViewedComponent(nullptr,false);routeViewport.setViewedComponent(nullptr,false);setLookAndFeel(nullptr);}
+    // Original V2.1 behaviour: fit the first native window to the logical
+    // desktop area, so Windows 200/300% scaling does not hide its edges.
+    void parentHierarchyChanged()override{if(!initialSizeChecked&&getPeer()!=nullptr){initialSizeChecked=true;if(auto* d=Desktop::getInstance().getDisplays().getDisplayForRect(getScreenBounds()))setSize(jmax(820,jmin(getWidth(),d->userArea.getWidth()-20)),jmax(560,jmin(getHeight(),d->userArea.getHeight()-70)));}}
     int getNumRows()override{return CurvePilot::laneCount;}
     void paintListBoxItem(int row,Graphics& g,int w,int h,bool chosen)override{
         auto l=p.getLane(row);if(chosen){g.setColour(surface);g.fillRoundedRectangle(3,3,(float)w-6,(float)h-6,8);}g.setColour(laneColour(row));g.setFont(Font(FontOptions(12)));g.drawText(String(row+1).paddedLeft('0',2),12,12,26,20,Justification::centredLeft);
