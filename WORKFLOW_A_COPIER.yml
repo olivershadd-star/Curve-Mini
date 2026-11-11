@@ -13,7 +13,7 @@ jobs:
       - name: Configurer Windows x64
         run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
       - name: Compiler les tests
-        run: cmake --build build --config Release --target curve_tests motion_tests processor_tests vst3_test --parallel 2
+        run: cmake --build build --config Release --target curve_tests motion_tests processor_tests vst3_test window_placement_tests --parallel 2
       - name: Verifier les courbes, mouvements et processeur
         run: ctest --test-dir build -C Release --output-on-failure
       - name: Conserver l apercu de l interface native
