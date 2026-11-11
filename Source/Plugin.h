@@ -5,7 +5,7 @@
 #include <optional>
 class CurvePilot final:public juce::AudioProcessor,private juce::Timer,private juce::AudioProcessorValueTreeState::Listener {
 public:
-    static constexpr int laneCount=12;
+    static constexpr int laneCount=4;
     struct Lane {
         curve::Data curve=curve::preset(0,4);
         juce::String name,script,motionText,port;
@@ -23,7 +23,7 @@ public:
     std::atomic<bool> hostPlaying{false};
     std::atomic<int> revision{0};
     juce::String status="Choisir une destination, connecter, puis activer l'envoi.";
-    int editorWidth=1380,editorHeight=880,selectedLaneUI=0;
+    int editorWidth=720,editorHeight=820,selectedLaneUI=0;
     bool sending=false;
     std::atomic<bool> standalonePlaying{false},transportReset{false};
     std::atomic<double> standaloneBpm{120};

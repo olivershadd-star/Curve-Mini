@@ -1,4 +1,4 @@
-# Curve Mini — reprise depuis Curve Pilot V2.1 R2
+# Curve Mini — quatre courbes pour Live Lite
 
 Cette base repart de l'archive ANKS_Curve_Pilot_V2_1_VST3_et_Autonome_Sources.zip
 fournie par l'utilisateur. Les précédentes tentatives Mini ne servent pas de base.
@@ -14,12 +14,11 @@ bars/offset/smooth/depth. L'annulation ne restaure plus une ancienne destination
 
 ## Interface native du plugin
 
-A gauche, les douze lignes, leurs noms et leurs destinations. Au centre, le
-même éditeur de courbes agrandi : dessin, points, formes et copier/coller. Les
-réglages de lecture courants restent visibles. Phase, profondeur, lissage,
-variation et outils avancés se déplient dans le même panneau, avec défilement.
-A droite, destination, commande manuelle et transfert vers un clip. Ce n'est
-pas une page web intégrée : l'interface est en C++/JUCE.
+Quatre sélecteurs de courbe en haut, puis un seul éditeur agrandi : dessin,
+points, formes et copier/coller. Les vues Courbe, Destination et Décrire / Code
+occupent la même fenêtre. Les réglages avancés se déplient et défilent.
+La destination comprend le routage, la commande manuelle et le transfert MIDI.
+L'interface est native C++/JUCE.
 
 ## Ce qui est retiré
 
@@ -45,7 +44,7 @@ Dans Live : entrée du port Remote ON, Track OFF, Sync OFF ; sortie tout OFF.
 Connecter dans Mini. Ctrl+M dans Live : sélectionner une macro, puis Assigner
 dans Live dans Mini. Seul le CC de cette ligne est envoyé à 64, ENVOI est coupé.
 Quitter Ctrl+M, activer la ligne et ENVOI. La courbe suit la lecture de Live.
-Le canal par défaut est 16, CC20 à 31, pour distinguer ces adresses des
+Le canal par défaut est 16, CC20 à 23, pour distinguer ces adresses des
 contrôleurs physiques courants sur canal1. Eviter les collisions d'assignation.
 Max for Live n'est pas requis ; instruments et effets restent dans Ableton.
 
@@ -99,3 +98,29 @@ vérifie le processeur, l'interface native, la sauvegarde, le MIDI exporté et l
 chargement du VST3 réel par un hôte indépendant. Un PNG de l'interface C++ est
 produit par les tests. Le résultat dans Live et la charge doivent être mesurés
 sur le poste utilisateur. Les anciens documents V2.1 sont archivés sous docs/.
+
+## Fenêtre extérieure compacte, espace à droite
+
+Quatre courbes indépendantes, une seule fenêtre d'édition. Chaque courbe possède
+son aperçu en haut. Les trois vues Courbe / Destination / Décrire-Code utilisent
+la même surface ; le traducteur n'ouvre pas de fenêtre supplémentaire. Les seules
+boîtes système sont les sélecteurs de fichiers et le menu de session.
+
+Taille initiale : 720 × 820 unités logiques, réduite à environ 52 % de la largeur
+disponible et à la hauteur utile de l'écran. Minimum 560 × 560, avec défilement.
+Cela réserve de la place à droite, y compris avec la mise à l'échelle Windows.
+L'ajustement prend en compte l'écran contenant la fenêtre.
+
+Sous Windows, Mini tente de placer sa fenêtre flottante à gauche. La fonction
+n'agit que sur une fenêtre de plugin possédée par une autre fenêtre ; elle ne
+déplace jamais une fenêtre principale sans propriétaire. Le bouton Placer à
+gauche permet de redemander taille et position. Le placement final dépend de
+la fenêtre fournie par l'hôte ; un déplacement manuel reste possible.
+
+Dans Live Lite, Mini est sur une piste de contrôle séparée. Il ne s'insère pas
+avant l'Instrument Rack comme un effet MIDI natif. Ses CC rejoignent les macros
+par un port virtuel avec Remote activé, ou une machine par la sortie choisie.
+L'acceptation d'une fenêtre extérieure ne change pas cette limite de Live.
+
+Les quatre premières courbes d'un ancien fichier V2.1 peuvent être importées ;
+les lignes au-delà de quatre ne sont pas intégrées. Conserver le fichier original.

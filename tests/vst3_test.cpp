@@ -9,7 +9,7 @@ int main(int argc,char** argv){
     format.findAllTypesForFile(descriptions,bundle.getFullPathName());
     if(descriptions.size()!=1||!descriptions[0]->isInstrument){std::cerr<<"Expected one instrument; found "<<descriptions.size()<<std::endl;return 3;}
     juce::String error;auto plugin=format.createInstanceFromDescription(*descriptions[0],48000,256,error);
-    if(!plugin||!plugin->acceptsMidi()||plugin->getParameters().size()<96){std::cerr<<error<<std::endl;return 4;}
+    if(!plugin||!plugin->acceptsMidi()||plugin->getParameters().size()<32){std::cerr<<error<<std::endl;return 4;}
     {std::unique_ptr<juce::AudioProcessorEditor> ui(plugin->createEditorIfNeeded());if(!ui)return 5;ui->addToDesktop(juce::ComponentPeer::windowIsTemporary);ui->setVisible(true);juce::MessageManager::getInstance()->runDispatchLoopUntil(80);ui->removeFromDesktop();}
     plugin->setRateAndBufferSizeDetails(48000,256);plugin->prepareToPlay(48000,256);juce::AudioBuffer<float> audio(2,256);audio.clear();audio.setSample(0,0,1);juce::MidiBuffer midi;plugin->processBlock(audio,midi);
     if(audio.getMagnitude(0,256)!=0)return 6;

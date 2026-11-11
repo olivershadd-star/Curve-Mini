@@ -1,8 +1,8 @@
-name: Curve Mini - reprise V2.1 - Windows
+name: Curve Mini - quatre courbes Lite - Windows
 on:
   workflow_dispatch:
   push:
-    branches: [reprise-v21]
+    branches: [quatre-courbes-lite]
 permissions:
   contents: read
 jobs:
@@ -16,18 +16,28 @@ jobs:
         run: cmake --build build --config Release --target curve_tests motion_tests processor_tests vst3_test --parallel 2
       - name: Verifier les courbes, mouvements et processeur
         run: ctest --test-dir build -C Release --output-on-failure
+      - name: Conserver l apercu de l interface native
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path 'build/curve-mini-interface.png') {
+            $nativeImage = [Convert]::ToBase64String([IO.File]::ReadAllBytes('build/curve-mini-interface.png'))
+            for ($offset = 0; $offset -lt $nativeImage.Length; $offset += 4096) {
+              Write-Output ('NATIVE_IMAGE_CHUNK ' + $nativeImage.Substring($offset, [Math]::Min(4096, $nativeImage.Length - $offset)))
+            }
+          }
       - name: Compiler les formats Windows
         run: cmake --build build --config Release --target CurveMini_VST3 CurveMini_Standalone --parallel 2
       - uses: actions/upload-artifact@v4
         with:
-          name: Curve-Mini-reprise-V21-Windows-x64
+          name: Curve-Mini-4-Courbes-Lite-Windows-x64
           path: |
             build/CurveMini_artefacts/Release/VST3/
             build/CurveMini_artefacts/Release/Standalone/
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Curve-Mini-interface-native
+          name: Curve-Mini-4-Courbes-Interface
           path: |
             build/curve-mini-interface.png
             build/Testing/Temporary/LastTest.log

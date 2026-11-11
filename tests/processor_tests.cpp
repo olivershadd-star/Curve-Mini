@@ -6,7 +6,7 @@
 #include <iostream>
 int main(){
     juce::ScopedJuceInitialiser_GUI init;CurvePilot p;
-    assert(p.acceptsMidi()&&!p.producesMidi()&&p.getParameters().size()==96);
+    assert(p.acceptsMidi()&&!p.producesMidi()&&p.getParameters().size()==32&&CurvePilot::laneCount==4);
     auto original=p.getLane(0).curve;
     p.replacePoints(0,{{0,0},{.5,1},{1,0}});assert(p.getLane(0).pointMode&&p.getLane(0).curve.y[1024]==1);
     p.copyCurve(0);p.configureDestination(1,true,"usb-b",2,74,"Filtre");p.pasteCurve(1);
@@ -20,7 +20,7 @@ int main(){
     assert(restored.getLane(1).port=="usb-c"&&restored.getLane(1).curve.y==p.getLane(1).curve.y&&restored.getLane(1).cc==75);
     restored.arm(true);assert(!restored.sending);
     // An editor must not change modes or destinations by creating attachments.
-    {std::unique_ptr<juce::AudioProcessorEditor> editor(restored.createEditor());editor->setSize(820,560);editor->setSize(1380,880);{auto snapshot=editor->createComponentSnapshot(editor->getLocalBounds());juce::FileOutputStream out(juce::File::getCurrentWorkingDirectory().getChildFile("curve-mini-interface.png"));juce::PNGImageFormat png;assert(out.openedOk()&&png.writeImageToStream(snapshot,out));}assert(restored.isManual(1)&&!restored.isManual(0)&&restored.getLane(1).port=="usb-c");}
+    {std::unique_ptr<juce::AudioProcessorEditor> editor(restored.createEditor());editor->setSize(560,560);editor->setSize(720,820);auto click=[&](const juce::String& title){std::function<juce::Button*(juce::Component&)> find=[&](juce::Component& c)->juce::Button*{if(auto* b=dynamic_cast<juce::Button*>(&c))if(b->getButtonText()==title)return b;for(auto* child:c.getChildren())if(auto* b=find(*child))return b;return nullptr;};auto* b=find(*editor);assert(b&&b->onClick);b->onClick();};click("Decrire / Code");click("Courbe");{auto snapshot=editor->createComponentSnapshot(editor->getLocalBounds());juce::FileOutputStream out(juce::File::getCurrentWorkingDirectory().getChildFile("curve-mini-interface.png"));juce::PNGImageFormat png;assert(out.openedOk()&&png.writeImageToStream(snapshot,out));}assert(restored.isManual(1)&&!restored.isManual(0)&&restored.getLane(1).port=="usb-c");}
     juce::AudioBuffer<float> audio(2,128);audio.clear();audio.setSample(0,0,1);juce::MidiBuffer input;input.addEvent(juce::MidiMessage::noteOn(1,60,(juce::uint8)100),0);restored.processBlock(audio,input);assert(audio.getMagnitude(0,128)==0&&input.isEmpty());
     auto file=juce::File::getSpecialLocation(juce::File::tempDirectory).getNonexistentChildFile("curve-mini-test",".mid",false);
     assert(p.exportMidi(1,file));juce::FileInputStream stream(file);juce::MidiFile midi;assert(midi.readFrom(stream)&&midi.getNumTracks()==1&&midi.getTimeFormat()==960);
