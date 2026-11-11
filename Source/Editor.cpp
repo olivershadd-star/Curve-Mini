@@ -110,7 +110,8 @@ public:
         connect.onClick=[this]{p.connectOutputs();};send.onClick=[this]{const ScopedLock guard(p.mutex);p.arm(!p.sending);};fit.onClick=[this]{initialFit=false;placementAttempts=0;fitToLeft();};
         connect.setTooltip("Ouvre une seule fois chaque sortie configuree pour les quatre courbes.");
         curvePage.onClick=[this]{showPage(0);};routePage.onClick=[this]{showPage(1);};motionPage.onClick=[this]{showPage(2);};
-        session.onClick=[this]{PopupMenu menu;menu.addItem(1,"Exporter la session");menu.addItem(2,"Importer une session");menu.showMenuAsync(PopupMenu::Options().withTargetComponent(&session),[safe=Component::SafePointer<Editor>(this)](int result){if(safe&&result)safe->fileDialog(result);});};
+        const Component::SafePointer<Editor> safeEditor(this);
+        session.onClick=[safeEditor]{if(!safeEditor)return;PopupMenu menu;menu.addItem(1,"Exporter la session");menu.addItem(2,"Importer une session");menu.showMenuAsync(PopupMenu::Options().withTargetComponent(&safeEditor->session),[safeEditor](int result){if(safeEditor&&result)safeEditor->fileDialog(result);});};
         free.onClick=[this]{p.setPointMode(selected,false);sync();};point.onClick=[this]{p.setPointMode(selected,true);sync();};
         copy.onClick=[this]{p.copyCurve(selected);};paste.onClick=[this]{p.pasteCurve(selected);sync();};undo.onClick=[this]{p.undoCurve(selected);sync();};lock.onClick=[this]{p.toggleLock(selected);sync();};
         shape.addItemList({"Vague","Rampe +","Rampe -","Triangle","Douce","Paliers"},1);shape.setTextWhenNothingSelected("Forme...");shape.onChange=[this]{if(shape.getSelectedId()>0){p.replaceCurve(selected,curve::preset(shape.getSelectedId()-1,p.get(selected,"bars")));shape.setSelectedId(0,dontSendNotification);sync();}};
