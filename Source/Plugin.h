@@ -41,7 +41,7 @@ public:
     bool exportMidi(int,const juce::File&);
     void exportSession(const juce::File&);bool importSession(const juce::File&);
     const juce::String getName()const override{return "Curve Mini";}
-    bool acceptsMidi()const override{return true;}bool producesMidi()const override{return false;}
+    bool acceptsMidi()const override{return true;}bool producesMidi()const override{return true;}
     double getTailLengthSeconds()const override{return 0;}
     bool isBusesLayoutSupported(const BusesLayout&)const override;
     void prepareToPlay(double,int)override{}void releaseResources()override{hostPlaying=false;}

@@ -66,18 +66,37 @@ void CurvePilot::connectOutputs(){
 }
 bool CurvePilot::routesValid(){
     for(int i=0;i<laneCount;++i)if(get(i,"on")>=.5f){auto& a=lanes[(size_t)i];
-        if(a.port.isEmpty()||outputs.find(a.port)==outputs.end()){status="Sortie de la ligne "+String(i+1)+" non connectee.";return false;}
+        if((a.port.isEmpty()&&JUCEApplicationBase::isStandaloneApp())||(a.port.isNotEmpty()&&outputs.find(a.port)==outputs.end())){status="Sortie de la ligne "+String(i+1)+" non connectee.";return false;}
         for(int j=0;j<i;++j){auto& b=lanes[(size_t)j];if(get(j,"on")>=.5f&&a.port==b.port&&a.channel==b.channel&&a.cc==b.cc){status="Meme port / canal / CC sur deux lignes actives : "+String(j+1)+" et "+String(i+1);return false;}}
     }return true;
 }
-void CurvePilot::arm(bool on){const ScopedLock lock(mutex);sending=false;resetOutputValues();if(on&&outputs.empty()){status="Connecter les sorties avant ENVOI.";return;}if(on&&!routesValid())return;sending=on;status=on?"ENVOI actif. Courbes pendant la lecture ; manuel disponible a l'arret.":"ENVOI arrete.";}
+void CurvePilot::arm(bool on){const ScopedLock lock(mutex);sending=false;resetOutputValues();if(on&&outputs.empty()&&JUCEApplicationBase::isStandaloneApp()){status="Connecter les sorties avant ENVOI.";return;}if(on&&!routesValid())return;sending=on;status=on?"ENVOI actif. Courbes pendant la lecture ; manuel disponible a l'arret.":"ENVOI arrete.";}
 void CurvePilot::assign(int i){const ScopedLock lock(mutex);sending=false;auto& l=lanes[(size_t)i];auto it=outputs.find(l.port);if(it==outputs.end()){status="Connecter la sortie de cette ligne avant Assigner.";return;}it->second->sendMessageNow(MidiMessage::controllerEvent(l.channel,l.cc,64));status="Une seule commande envoyee. Quitter Ctrl+M dans Live, puis reactiver ENVOI.";}
 void CurvePilot::processBlock(AudioBuffer<float>& audio,MidiBuffer& midi){
-    audio.clear();midi.clear();transportSequence.fetch_add(1);bool play=false;
+    audio.clear();transportSequence.fetch_add(1);bool play=false;
     if(auto* h=getPlayHead())if(auto pos=h->getPosition()){
         const auto q=pos->getPpqPosition();play=pos->getIsPlaying()&&q&&std::isfinite(*q);if(q&&std::isfinite(*q))hostQuarter=*q;
         if(auto v=pos->getBpm())if(std::isfinite(*v)&&*v>0)hostTempo=*v;
         if(auto v=pos->getTimeSignature())if(v->numerator>0&&v->denominator>0)hostBeats=v->numerator*4.0/v->denominator;
+    }
+    { const ScopedTryLock guard(mutex);
+      if(guard.isLocked() && sending){
+        for(int i=0;i<laneCount;++i){auto& l=lanes[(size_t)i];
+          if(l.port.isNotEmpty())continue;
+          if(manualRequests[(size_t)i].exchange(false)){l.manual=true;revision++;}
+          if(get(i,"on")<.5f||(!l.manual&&!play)){l.last=-1;l.filterValid=false;continue;}
+          float v=get(i,"value")/127.f;
+          if(!l.manual){double phase=hostQuarter.load()/(hostBeats.load()*get(i,"bars"))+get(i,"offset")*.01;
+            v=.5f+get(i,"depth")*.01f*(l.curve.at(phase)-.5f);
+            v=jlimit(0.f,1.f,(get(i,"min")+(get(i,"max")-get(i,"min"))*v)*.01f);
+            float ms=get(i,"smooth");double seconds=audio.getNumSamples()/jmax(1.0,getSampleRate());
+            if(!l.filterValid){l.filtered=v;l.filterValid=true;}
+            l.filtered+=(ms<=0?1.f:(float)(1-std::exp(-seconds/(ms*.001))))*(v-l.filtered);v=l.filtered;
+          }
+          int value=jlimit(0,127,roundToInt(v*127));
+          if(value!=l.last){midi.addEvent(MidiMessage::controllerEvent(l.channel,l.cc,value),0);l.last=value;}
+        }
+      }
     }
     hostPlaying=play;hostStamp=Time::getMillisecondCounterHiRes();transportSequence.fetch_add(1);
 }
@@ -90,7 +109,7 @@ void CurvePilot::timerCallback(){
     else{auto seq=transportSequence.load();if(!(seq&1u)){q=hostQuarter.load();b=hostBeats.load();double age=now-hostStamp.load();play=hostPlaying.load()&&age>=0&&age<250;const auto t=hostTempo.load();play=play&&seq==transportSequence.load();if(play)q+=age*t/60000;}}
     if(play)visualBars=q/b;
     if(!sending)return;if(!routesValid()){sending=false;return;}
-    for(int i=0;i<laneCount;++i){auto& l=lanes[(size_t)i];if(get(i,"on")<.5f||(!l.manual&&!play)){l.last=-1;l.filterValid=false;continue;}
+    for(int i=0;i<laneCount;++i){auto& l=lanes[(size_t)i];if(l.port.isEmpty())continue;if(get(i,"on")<.5f||(!l.manual&&!play)){l.last=-1;l.filterValid=false;continue;}
         float wanted=get(i,"value")/127;
         if(!l.manual){double phase=q/(b*get(i,"bars"))+get(i,"offset")*.01;float v=l.curve.at(phase);v=.5f+get(i,"depth")*.01f*(v-.5f);wanted=jlimit(0.0f,1.0f,(get(i,"min")+(get(i,"max")-get(i,"min"))*v)*.01f);
             float ms=get(i,"smooth");if(!l.filterValid){l.filtered=l.last>=0?l.last/127.f:wanted;l.filterValid=true;}float alpha=ms<=0?1.f:(float)(1-std::exp(-dt/(ms*.001)));l.filtered+=alpha*(wanted-l.filtered);wanted=l.filtered;
@@ -113,7 +132,7 @@ bool CurvePilot::exportMidi(int i,const File& file){
 void CurvePilot::getStateInformation(MemoryBlock& out){
     const ScopedLock lock(mutex);ValueTree save("CURVE_MINI_SESSION");save.addChild(state.copyState(),-1,nullptr);ValueTree data("CONTENT");data.setProperty("width",editorWidth,nullptr);data.setProperty("height",editorHeight,nullptr);data.setProperty("selected",selectedLaneUI,nullptr);data.setProperty("standaloneBpm",standaloneBpm.load(),nullptr);
     for(int i=0;i<laneCount;++i){auto& l=lanes[(size_t)i];ValueTree v("LANE");v.setProperty("index",i,nullptr);v.setProperty("name",l.name,nullptr);v.setProperty("port",l.port,nullptr);v.setProperty("channel",l.channel,nullptr);v.setProperty("cc",l.cc,nullptr);v.setProperty("hardware",l.hardware,nullptr);v.setProperty("manual",isManual(i),nullptr);v.setProperty("locked",l.locked,nullptr);v.setProperty("pointMode",l.pointMode,nullptr);v.setProperty("script",l.script,nullptr);v.setProperty("motionText",l.motionText,nullptr);
-        MemoryBlock blob(l.curve.y.data(),l.curve.y.size()*sizeof(float));v.setProperty("curve",blob.toBase64Encoding(),nullptr);for(auto pt:l.points){ValueTree p("POINT");p.setProperty("x",pt.x,nullptr);p.setProperty("y",pt.y,nullptr);v.addChild(p,-1,nullptr);}data.addChild(v,-1,nullptr);
+        MemoryBlock blob(l.curve.y.data(),l.curve.y.size()*sizeof(float));v.setProperty("curve",blob.toBase64Encoding(),nullptr);for(auto pt:l.points){ValueTree p("POINT");p.setProperty("x",pt.x,nullptr);p.setProperty("y",pt.y,nullptr);p.setProperty("tension",pt.tension,nullptr);p.setProperty("shape",pt.shape,nullptr);v.addChild(p,-1,nullptr);}data.addChild(v,-1,nullptr);
     }save.addChild(data,-1,nullptr);copyXmlToBinary(*save.createXml(),out);
 }
 void CurvePilot::setStateInformation(const void* bytes,int size){
@@ -130,7 +149,7 @@ void CurvePilot::setStateInformation(const void* bytes,int size){
     for(int i=0;i<laneCount;++i){lanes[(size_t)i]=Lane{};lanes[(size_t)i].cc=20+i;lanes[(size_t)i].name="Courbe "+String(i+1);previous[(size_t)i].reset();}
     for(auto v:content)if(v.hasType("LANE")){int i=(int)v["index"];if(i<0||i>=laneCount)continue;auto& l=lanes[(size_t)i];l.name=v["name"].toString();l.port=legacy?String{}:v["port"].toString();l.channel=jlimit(1,16,(int)v.getProperty("channel",16));l.cc=jlimit(0,127,(int)v.getProperty("cc",20+i));l.hardware=(bool)v["hardware"];l.manual=!legacy&&(bool)v["manual"];l.locked=(bool)v["locked"];l.pointMode=(bool)v["pointMode"];l.script=v["script"].toString();l.motionText=v["motionText"].toString();l.curve.bars=get(i,"bars");
         MemoryBlock blob;if(blob.fromBase64Encoding(v["curve"].toString())&&blob.getSize()==l.curve.y.size()*sizeof(float)){std::memcpy(l.curve.y.data(),blob.getData(),blob.getSize());for(auto& y:l.curve.y)y=std::isfinite(y)?jlimit(0.f,1.f,y):.5f;}
-        for(auto pt:v)if(pt.hasType("POINT"))l.points.push_back({(double)pt["x"],(float)pt["y"]});try{if(!l.points.empty())l.points=curve::canonicalPoints(l.points);else l.pointMode=false;}catch(...){l.points.clear();l.pointMode=false;}if(legacy)set(i,"on",0);
+        for(auto pt:v)if(pt.hasType("POINT"))l.points.push_back({(double)pt["x"],(float)pt["y"],(double)pt.getProperty("tension",0.0),(int)pt.getProperty("shape",0)});try{if(!l.points.empty())l.points=curve::canonicalPoints(l.points);else l.pointMode=false;}catch(...){l.points.clear();l.pointMode=false;}if(legacy)set(i,"on",0);
     }
     for(auto& request:manualRequests)request=false;standalonePlaying=false;localQuarter=0;lastTick=0;clipboard.reset();status=legacy?"Courbes de Curve Pilot importees. Les VST ne sont pas charges ; reassigner les destinations.":"Session restauree. Verifier les destinations, connecter puis activer ENVOI.";revision++;
 }

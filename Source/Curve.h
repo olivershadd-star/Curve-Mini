@@ -82,9 +82,24 @@ inline Data preset(int shape,double bars){Data d;d.bars=bars;for(int n=0;n<=reso
     switch(shape){case 0:v=.5-.5*std::cos(2*pi*t);break;case 1:v=t;break;case 2:v=1-t;break;case 3:v=1-std::abs(2*t-1);break;case 4:v=t*t*(3-2*t);break;case 5:v=std::floor(t*8)/8;break;default:break;}d.y[(size_t)n]=(float)v;}return d;}
 inline Data vary(Data d,float depth,uint32_t seed){uint32_t x=seed?seed:1;std::array<double,9> anchors{};for(auto& a:anchors){x^=x<<13;x^=x>>17;x^=x<<5;a=((double)x/4294967295.0*2-1)*depth;}anchors.back()=anchors.front();
     for(int n=0;n<=resolution;++n){double t=(double)n/resolution*8;int a=std::min(7,(int)t);double f=ease(t-a,"smooth");d.y[(size_t)n]=(float)clamp(d.y[(size_t)n]+anchors[(size_t)a]+f*(anchors[(size_t)a+1]-anchors[(size_t)a]));}return d;}
-struct Point {double x=0;float y=0;};
+enum class SegmentShape { Curve, Smooth, Hold, Stairs, Wave, Triangle, Pulse };
+struct Point {double x=0;float y=0;double tension=0;int shape=0;};
+inline double segmentValue(double t, double tension, int shape){
+    t=clamp(t); tension=std::clamp(tension,-1.0,1.0);
+    const double exponent=std::pow(8.0,std::abs(tension));
+    double u=tension>=0?std::pow(t,exponent):1-std::pow(1-t,exponent);
+    switch(static_cast<SegmentShape>(shape)){
+        case SegmentShape::Smooth: return u*u*(3-2*u);
+        case SegmentShape::Hold: return t>=1?1:0;
+        case SegmentShape::Stairs: return t>=1?1:std::floor(u*8)/8;
+        case SegmentShape::Wave: return u+.12*std::sin(8*pi*u)*std::sin(pi*u);
+        case SegmentShape::Triangle: return u+.12*(2/pi)*std::asin(std::sin(8*pi*u))*std::sin(pi*u);
+        case SegmentShape::Pulse: return u+.12*(std::sin(8*pi*u)>=0?1:-1)*std::sin(pi*u);
+        default: return u;
+    }
+}
 inline std::vector<Point> canonicalPoints(std::vector<Point> points){
-    for(auto& p:points){if(!std::isfinite(p.x)||!std::isfinite(p.y))throw std::runtime_error("Point non fini");p.x=clamp(p.x);p.y=(float)clamp(p.y);}
+    for(auto& p:points){if(!std::isfinite(p.x)||!std::isfinite(p.y)||!std::isfinite(p.tension))throw std::runtime_error("Point non fini");p.x=clamp(p.x);p.y=(float)clamp(p.y);p.tension=std::clamp(p.tension,-1.0,1.0);p.shape=std::clamp(p.shape,0,6);}
     std::stable_sort(points.begin(),points.end(),[](const auto& a,const auto& b){return a.x<b.x;});
     std::vector<Point> out;
     for(auto p:points){if(!out.empty()&&std::abs(out.back().x-p.x)<1e-6)out.back()=p;else out.push_back(p);}
@@ -96,7 +111,7 @@ inline std::vector<Point> canonicalPoints(std::vector<Point> points){
 inline Data fromPoints(const std::vector<Point>& input,double bars){
     auto pts=canonicalPoints(input);Data d;d.bars=bars;size_t k=0;
     for(int n=0;n<=resolution;++n){double x=(double)n/resolution;while(k+2<pts.size()&&x>pts[k+1].x)++k;
-        const auto& a=pts[k];const auto& b=pts[k+1];double f=(x-a.x)/(b.x-a.x);d.y[(size_t)n]=(float)clamp(a.y+f*(b.y-a.y));}
+        const auto& a=pts[k];const auto& b=pts[k+1];double f=segmentValue((x-a.x)/(b.x-a.x),a.tension,a.shape);d.y[(size_t)n]=(float)clamp(a.y+f*(b.y-a.y));}
     return d;
 }
 inline std::vector<Point> simplify(const Data& data,double tolerance){
