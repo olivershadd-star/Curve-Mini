@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-project(CurveMini VERSION 0.4.0 LANGUAGES C CXX)
+project(CurveMini VERSION 0.5.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(CTest)
@@ -17,7 +17,7 @@ FetchContent_Declare(JUCE GIT_REPOSITORY https://github.com/juce-framework/JUCE.
 FetchContent_MakeAvailable(JUCE)
 juce_add_plugin(CurveMini COMPANY_NAME ANKS PLUGIN_MANUFACTURER_CODE Anks PLUGIN_CODE Cpm1
   FORMATS VST3 Standalone PRODUCT_NAME "Curve Mini" IS_SYNTH TRUE
-  NEEDS_MIDI_INPUT TRUE NEEDS_MIDI_OUTPUT FALSE IS_MIDI_EFFECT FALSE
+  NEEDS_MIDI_INPUT TRUE NEEDS_MIDI_OUTPUT TRUE IS_MIDI_EFFECT FALSE
   VST3_CATEGORIES Instrument Synth COPY_PLUGIN_AFTER_BUILD FALSE)
 juce_generate_juce_header(CurveMini)
 target_sources(CurveMini PRIVATE Source/Plugin.cpp Source/Editor.cpp Source/Plugin.h Source/Curve.h Source/MotionLanguage.h Source/WindowPlacement.cpp Source/WindowPlacement.h)

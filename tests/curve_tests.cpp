@@ -34,5 +34,13 @@ int main(){
  for(int n=1;n<curve::resolution;++n){variationBefore+=std::abs(jitter.y[(size_t)n]-jitter.y[(size_t)n-1]);variationAfter+=std::abs(polished.y[(size_t)n]-polished.y[(size_t)n-1]);assert(polished.y[(size_t)n]>=0&&polished.y[(size_t)n]<=1);}
  assert(variationAfter<variationBefore*.1);
  assert(curve::smoothDrawing(d,0).y==d.y);
+ // Segment types and tension: bounded data and exact endpoints at extremes.
+ for(int shape=0;shape<=6;++shape)for(double tension:{-1.0,0.0,1.0}){
+   auto shaped=curve::fromPoints({{0,0,tension,shape},{1,1}},4);
+   assert(shaped.y.front()==0&&shaped.y.back()==1);
+   for(float v:shaped.y)assert(std::isfinite(v)&&v>=0&&v<=1);
+ }
+ auto slow=curve::fromPoints({{0,0,1,0},{1,1}},4),fast=curve::fromPoints({{0,0,-1,0},{1,1}},4);
+ assert(slow.y[1024]<.01&&fast.y[1024]>.99);
  std::cout<<"PASS: original V2.1 curves, DSL, endpoints, bounds, repeatability, presets, invalid input, points, simplification and drawing smoothing\n";
 }

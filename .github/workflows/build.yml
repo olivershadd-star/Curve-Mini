@@ -1,8 +1,8 @@
-name: Curve Mini - quatre courbes Lite - Windows
+name: Curve Mini - precision et MIDI - Windows
 on:
   workflow_dispatch:
   push:
-    branches: [quatre-courbes-lite]
+    branches: [precision-midi]
 permissions:
   contents: read
 jobs:
@@ -30,7 +30,7 @@ jobs:
         run: cmake --build build --config Release --target CurveMini_VST3 CurveMini_Standalone --parallel 2
       - uses: actions/upload-artifact@v4
         with:
-          name: Curve-Mini-4-Courbes-Lite-Windows-x64
+          name: Curve-Mini-Precision-MIDI-Windows-x64
           path: |
             build/CurveMini_artefacts/Release/VST3/
             build/CurveMini_artefacts/Release/Standalone/
