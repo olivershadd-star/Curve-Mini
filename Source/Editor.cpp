@@ -107,14 +107,14 @@ public:
         auto r=getLocalBounds().toFloat().reduced(2);g.setColour(getToggleState()?surface:Colour(0xff131b28));g.fillRoundedRectangle(r,8);
         if(getToggleState()||over){g.setColour(laneColour(lane).withAlpha(.7f));g.drawRoundedRectangle(r,8,1);}
         auto l=p.getLane(lane);g.setColour(laneColour(lane));g.setFont(Font(FontOptions(12)));g.drawText(String(lane+1).paddedLeft('0',2),10,8,23,20,Justification::centredLeft);
-        g.setColour(ink);g.drawFittedText(l.name,35,8,getWidth()-44,20,Justification::centredLeft,1);
+        if(getWidth()>=110){g.setColour(ink);g.drawFittedText(l.name,35,8,getWidth()-44,20,Justification::centredLeft,1);}
         Path path;for(int k=0;k<=64;++k){float x=12+(getWidth()-24)*k/64.f,y=58-l.curve.y[(size_t)(k*32)]*24;if(k==0)path.startNewSubPath(x,y);else path.lineTo(x,y);}
         g.setColour(laneColour(lane).withAlpha(p.get(lane,"on")>=.5f?1.f:.4f));g.strokePath(path,PathStrokeType(1.3f));
     }
 };
 class Editor final:public AudioProcessorEditor,private Timer {
     CurvePilot& p;Theme theme;TooltipWindow tips{this,650};
-    std::array<std::unique_ptr<CurveTab>,4> tabs;
+    std::array<std::unique_ptr<CurveTab>,CurvePilot::laneCount> tabs;
     Label title,status,heading,routeHelp,manualLabel,manualHelp,nameLabel,portLabel,channelLabel,ccLabel,modeLabel;
     TextButton send{"ENVOI OFF"},connect{"Connecter"},session{"Session"},fit{"Placer a gauche"};
     TextButton curvePage{"Courbe"},routePage{"Destination"},motionPage{"Decrire / Code"};
@@ -130,15 +130,15 @@ class Editor final:public AudioProcessorEditor,private Timer {
     int selected=0,page=0,seen=-1,placementAttempts=0;bool syncing=false,expanded=false,initialFit=false;
 public:
     Editor(CurvePilot& owner):AudioProcessorEditor(owner),p(owner),graph(p,0){
-        setLookAndFeel(&theme);selected=jlimit(0,3,p.selectedLaneUI);
+        setLookAndFeel(&theme);selected=jlimit(0,CurvePilot::laneCount-1,p.selectedLaneUI);
         for(auto* c:std::initializer_list<Component*>{&title,&send,&connect,&session,&fit,&curvePage,&routePage,&motionPage,&status,&viewport,&play,&stop,&bpm})addAndMakeVisible(c);
-        label(title,"CURVE MINI / 4",20,ink);label(status,p.status,12);
-        for(int i=0;i<4;++i){tabs[(size_t)i]=std::make_unique<CurveTab>(p,i);addAndMakeVisible(*tabs[(size_t)i]);tabs[(size_t)i]->onClick=[this,i]{select(i);};}
+        label(title,"CURVE MINI / 8",20,ink);label(status,p.status,12);
+        for(int i=0;i<CurvePilot::laneCount;++i){tabs[(size_t)i]=std::make_unique<CurveTab>(p,i);addAndMakeVisible(*tabs[(size_t)i]);tabs[(size_t)i]->onClick=[this,i]{select(i);};}
         viewport.setViewedComponent(&editBody,false);viewport.setScrollBarsShown(true,false);
         for(auto* c:std::initializer_list<Component*>{&gridChoice,&brushChoice,&snapGrid,&stretchOut,&stretchIn,&tiltUp,&tiltDown,&drawHelp,&heading,&graph,&active,&free,&point,&copy,&paste,&undo,&lock,&shape,&advanced,&invert,&vary,&smooth})editBody.addAndMakeVisible(c);
         for(auto* c:std::initializer_list<Component*>{&nameLabel,&name,&portLabel,&ports,&channelLabel,&channel,&ccLabel,&cc,&modeLabel,&destination,&routeHelp,&manualLabel,&manual,&manualHelp,&assign,&resume,&midiExport,&refreshPorts})routeBody.addAndMakeVisible(c);
         connect.onClick=[this]{p.connectOutputs();};send.onClick=[this]{const ScopedLock guard(p.mutex);p.arm(!p.sending);};fit.onClick=[this]{initialFit=false;placementAttempts=0;fitToLeft();};
-        connect.setTooltip("Ouvre une seule fois chaque sortie configuree pour les quatre courbes.");
+        connect.setTooltip("Ouvre une seule fois chaque sortie configuree pour les huit courbes.");
         curvePage.onClick=[this]{showPage(0);};routePage.onClick=[this]{showPage(1);};motionPage.onClick=[this]{showPage(2);};
         const Component::SafePointer<Editor> safeEditor(this);
         session.onClick=[safeEditor]{if(!safeEditor)return;PopupMenu menu;menu.addItem(1,"Exporter la session");menu.addItem(2,"Importer une session");menu.showMenuAsync(PopupMenu::Options().withTargetComponent(&safeEditor->session),[safeEditor](int result){if(safeEditor&&result)safeEditor->fileDialog(result);});};
@@ -184,7 +184,7 @@ public:
     void select(int i){
         selected=i;graph.lane=i;activeAttachment.reset();valueAttachment.reset();for(auto& a:attachments)a.reset();
         activeAttachment=std::make_unique<BA>(p.state,id(i,"on"),active);const char* keys[]={"min","max","bars","offset","smooth","depth"};for(int k=0;k<6;++k)attachments[(size_t)k]=std::make_unique<SA>(p.state,id(i,keys[k]),sliders[(size_t)k]);valueAttachment=std::make_unique<SA>(p.state,id(i,"value"),manual);
-        for(int k=0;k<4;++k)tabs[(size_t)k]->setToggleState(k==i,dontSendNotification);sync();showPage(page);
+        for(int k=0;k<CurvePilot::laneCount;++k)tabs[(size_t)k]->setToggleState(k==i,dontSendNotification);sync();showPage(page);
     }
     void scan(){devices=MidiOutput::getAvailableDevices();sync();}
     void sync(){
@@ -207,7 +207,7 @@ public:
     void paint(Graphics& g)override{g.fillAll(bg);g.setColour(edge);g.drawHorizontalLine(73,16,(float)getWidth()-16);}
     void resized()override{
         auto r=getLocalBounds().reduced(16);auto header=r.removeFromTop(38);session.setBounds(header.removeFromRight(75).reduced(2,7));send.setBounds(header.removeFromRight(105).reduced(2,7));connect.setBounds(header.removeFromRight(95).reduced(2,7));title.setBounds(header);r.removeFromTop(6);
-        auto curves=r.removeFromTop(60);int tabWidth=curves.getWidth()/4;for(int i=0;i<4;++i)tabs[(size_t)i]->setBounds(curves.removeFromLeft(tabWidth));r.removeFromTop(6);
+        auto curves=r.removeFromTop(60);int tabWidth=curves.getWidth()/CurvePilot::laneCount;for(int i=0;i<CurvePilot::laneCount;++i)tabs[(size_t)i]->setBounds(curves.removeFromLeft(tabWidth));r.removeFromTop(6);
         auto nav=r.removeFromTop(30);curvePage.setBounds(nav.removeFromLeft(80));nav.removeFromLeft(4);routePage.setBounds(nav.removeFromLeft(105));nav.removeFromLeft(4);motionPage.setBounds(nav.removeFromLeft(125));fit.setBounds(nav.removeFromRight(125));
         status.setBounds(r.removeFromBottom(28));if(JUCEApplicationBase::isStandaloneApp()){auto row=r.removeFromBottom(32);play.setBounds(row.removeFromLeft(85));stop.setBounds(row.removeFromLeft(100));bpm.setBounds(row);}
         r.removeFromTop(15);viewport.setBounds(r);int w=jmax(480,viewport.getMaximumVisibleWidth());editBody.setSize(w,expanded?1040:750);routeBody.setSize(w,700);if(motionPanel)motionPanel->setSize(w,650);

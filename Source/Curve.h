@@ -14,7 +14,10 @@ struct Data {
     std::array<float,resolution+1> y{};
     double bars=4;
     float at(double phase) const {
+        if(!std::isfinite(phase))return y[0];
         phase-=std::floor(phase);double p=phase*resolution;int n=(int)p;
+        // phase-floor(phase) can round to exactly 1.0 for tiny negative phases: keep n+1 inside the table.
+        if(n>resolution-1)n=resolution-1;
         return y[(size_t)n]+(float)(p-n)*(y[(size_t)n+1]-y[(size_t)n]);
     }
 };

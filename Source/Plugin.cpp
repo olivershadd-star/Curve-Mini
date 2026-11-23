@@ -45,12 +45,12 @@ bool CurvePilot::hasClipboard()const{const ScopedLock lock(mutex);return clipboa
 void CurvePilot::exportSession(const File& f){MemoryBlock blob;getStateInformation(blob);bool ok=f.replaceWithData(blob.getData(),blob.getSize());const ScopedLock lock(mutex);status=ok?"Session exportee.":"Echec export session.";}
 bool CurvePilot::importSession(const File& f){MemoryBlock blob;if(!f.loadFileAsData(blob))return false;auto xml=getXmlFromBinary(blob.getData(),(int)blob.getSize());if(!xml||!(xml->hasTagName("CURVE_MINI_SESSION")||xml->hasTagName("CURVEPILOT_SESSION")))return false;setStateInformation(blob.getData(),(int)blob.getSize());return true;}
 CurvePilot::CurvePilot():AudioProcessor(BusesProperties().withInput("Audio Input",AudioChannelSet::stereo(),true).withOutput("Output",AudioChannelSet::stereo(),true)),state(*this,nullptr,"CurvePilot",layout()){
-    for(int i=0;i<laneCount;++i){lanes[(size_t)i].cc=20+i;lanes[(size_t)i].name="Courbe "+String(i+1);valueIds[(size_t)i]=pid(i,"value");manualRequests[(size_t)i]=false;state.addParameterListener(valueIds[(size_t)i],this);}startTimerHz(100);
+    for(int i=0;i<laneCount;++i){lanes[(size_t)i].cc=20+i;lanes[(size_t)i].name="Courbe "+String(i+1);valueIds[(size_t)i]=pid(i,"value");{static const char* keys[keyCount]={"on","min","max","bars","offset","smooth","depth","value"};for(int k=0;k<keyCount;++k)rawParam[(size_t)i][(size_t)k]=state.getRawParameterValue(pid(i,keys[k]));}manualRequests[(size_t)i]=false;state.addParameterListener(valueIds[(size_t)i],this);}startTimer(10);
 }
 CurvePilot::~CurvePilot(){stopTimer();for(auto& id:valueIds)state.removeParameterListener(id,this);}
 bool CurvePilot::isBusesLayoutSupported(const BusesLayout& b)const{return (b.getMainInputChannelSet().isDisabled()||b.getMainInputChannelSet()==AudioChannelSet::stereo())&&b.getMainOutputChannelSet()==AudioChannelSet::stereo();}
 void CurvePilot::parameterChanged(const String& id,float){for(int i=0;i<laneCount;++i)if(id==valueIds[(size_t)i]){manualRequests[(size_t)i]=true;return;}}
-bool CurvePilot::isManual(int i)const{return lanes[(size_t)i].manual||manualRequests[(size_t)i].load();}
+bool CurvePilot::isManual(int i)const{const ScopedLock lock(mutex);return lanes[(size_t)i].manual||manualRequests[(size_t)i].load();}
 void CurvePilot::resumeCurve(int i){const ScopedLock lock(mutex);manualRequests[(size_t)i]=false;lanes[(size_t)i].manual=false;lanes[(size_t)i].filterValid=false;lanes[(size_t)i].last=-1;revision++;}
 void CurvePilot::resetOutputValues(){for(auto& l:lanes){l.last=-1;l.filterValid=false;}}
 void CurvePilot::configureDestination(int i,bool hardware,const String& port,int channel,int cc,const String& name){
@@ -61,7 +61,7 @@ void CurvePilot::configureDestination(int i,bool hardware,const String& port,int
 }
 void CurvePilot::connectOutputs(){
     const ScopedLock lock(mutex);sending=false;outputs.clear();resetOutputValues();StringArray ids;for(auto& l:lanes)if(l.port.isNotEmpty())ids.addIfNotAlreadyThere(l.port);
-    int failed=0;for(auto& id:ids){auto out=MidiOutput::openDevice(id);if(out)outputs.emplace(id,std::move(out));else failed++;}
+    int failed=0;for(auto& id:ids){auto out=MidiOutput::openDevice(id);if(out)outputs.emplace(id,std::shared_ptr<MidiOutput>(std::move(out)));else failed++;}
     status=failed?String(failed)+" sortie(s) indisponible(s). Verifier les connexions.":outputs.empty()?"Choisir une sortie dans Destination.":"Sorties connectees. Activer ENVOI pour envoyer.";
 }
 bool CurvePilot::routesValid(){
@@ -81,26 +81,29 @@ void CurvePilot::processBlock(AudioBuffer<float>& audio,MidiBuffer& midi){
     }
     { const ScopedTryLock guard(mutex);
       if(guard.isLocked() && sending){
+        const double seconds=audio.getNumSamples()/jmax(1.0,getSampleRate());
         for(int i=0;i<laneCount;++i){auto& l=lanes[(size_t)i];
-          if(l.port.isNotEmpty())continue;
+          if(l.port.isNotEmpty())continue; // lanes with a port are sent by the sender thread
           if(manualRequests[(size_t)i].exchange(false)){l.manual=true;revision++;}
-          if(get(i,"on")<.5f||(!l.manual&&!play)){l.last=-1;l.filterValid=false;continue;}
-          float v=get(i,"value")/127.f;
-          if(!l.manual){double phase=hostQuarter.load()/(hostBeats.load()*get(i,"bars"))+get(i,"offset")*.01;
-            v=.5f+get(i,"depth")*.01f*(l.curve.at(phase)-.5f);
-            v=jlimit(0.f,1.f,(get(i,"min")+(get(i,"max")-get(i,"min"))*v)*.01f);
-            float ms=get(i,"smooth");double seconds=audio.getNumSamples()/jmax(1.0,getSampleRate());
-            if(!l.filterValid){l.filtered=v;l.filterValid=true;}
-            l.filtered+=(ms<=0?1.f:(float)(1-std::exp(-seconds/(ms*.001))))*(v-l.filtered);v=l.filtered;
+          if(raw(i,kOn)<.5f||(!l.manual&&!play)){l.last=-1;l.filterValid=false;continue;}
+          const auto p=params(i);
+          float v=p.value/127.f;
+          if(!l.manual){
+            const float wanted=lanemath::target(l.curve,hostQuarter.load(),hostBeats.load(),p);
+            v=lanemath::smooth(l.filtered,l.filterValid,wanted,seconds,p.smooth,wanted);
           }
-          int value=jlimit(0,127,roundToInt(v*127));
+          const int value=lanemath::toCC(v);
           if(value!=l.last){midi.addEvent(MidiMessage::controllerEvent(l.channel,l.cc,value),0);l.last=value;}
         }
       }
     }
     hostPlaying=play;hostStamp=Time::getMillisecondCounterHiRes();transportSequence.fetch_add(1);
 }
-void CurvePilot::timerCallback(){
+void CurvePilot::hiResTimerCallback(){
+    // Messages are prepared under the mutex and sent after releasing it, so a slow MIDI driver can
+    // never block the editor or the audio thread's try-lock.
+    std::vector<std::pair<std::shared_ptr<MidiOutput>,MidiMessage>> pending;
+    {
     const double now=Time::getMillisecondCounterHiRes();const ScopedLock lock(mutex);
     const double dt=lastTick>0?jlimit(0.0,.25,(now-lastTick)/1000):0;lastTick=now;
     for(int i=0;i<laneCount;++i)if(manualRequests[(size_t)i].exchange(false)){lanes[(size_t)i].manual=true;revision++;}
@@ -109,21 +112,25 @@ void CurvePilot::timerCallback(){
     else{auto seq=transportSequence.load();if(!(seq&1u)){q=hostQuarter.load();b=hostBeats.load();double age=now-hostStamp.load();play=hostPlaying.load()&&age>=0&&age<250;const auto t=hostTempo.load();play=play&&seq==transportSequence.load();if(play)q+=age*t/60000;}}
     if(play)visualBars=q/b;
     if(!sending)return;if(!routesValid()){sending=false;return;}
-    for(int i=0;i<laneCount;++i){auto& l=lanes[(size_t)i];if(l.port.isEmpty())continue;if(get(i,"on")<.5f||(!l.manual&&!play)){l.last=-1;l.filterValid=false;continue;}
-        float wanted=get(i,"value")/127;
-        if(!l.manual){double phase=q/(b*get(i,"bars"))+get(i,"offset")*.01;float v=l.curve.at(phase);v=.5f+get(i,"depth")*.01f*(v-.5f);wanted=jlimit(0.0f,1.0f,(get(i,"min")+(get(i,"max")-get(i,"min"))*v)*.01f);
-            float ms=get(i,"smooth");if(!l.filterValid){l.filtered=l.last>=0?l.last/127.f:wanted;l.filterValid=true;}float alpha=ms<=0?1.f:(float)(1-std::exp(-dt/(ms*.001)));l.filtered+=alpha*(wanted-l.filtered);wanted=l.filtered;
+    for(int i=0;i<laneCount;++i){auto& l=lanes[(size_t)i];if(l.port.isEmpty())continue;if(raw(i,kOn)<.5f||(!l.manual&&!play)){l.last=-1;l.filterValid=false;continue;}
+        const auto p=params(i);float wanted=p.value/127.f;
+        if(!l.manual){
+            const float target=lanemath::target(l.curve,q,b,p);
+            wanted=lanemath::smooth(l.filtered,l.filterValid,target,dt,p.smooth,l.last>=0?l.last/127.f:target);
         }else l.filterValid=false;
-        int value=jlimit(0,127,roundToInt(wanted*127));if(value!=l.last){outputs.at(l.port)->sendMessageNow(MidiMessage::controllerEvent(l.channel,l.cc,value));l.last=value;}
+        const int value=lanemath::toCC(wanted);
+        if(value!=l.last){pending.emplace_back(outputs.at(l.port),MidiMessage::controllerEvent(l.channel,l.cc,value));l.last=value;}
     }
+    }
+    for(auto& m:pending)m.first->sendMessageNow(m.second);
 }
 bool CurvePilot::exportMidi(int i,const File& file){
-    MidiMessageSequence seq;double length;int channel,cc;Lane l;float minimum,maximum,depth,offset,smooth;double beats;
-    {const ScopedLock lock(mutex);l=lanes[(size_t)i];length=get(i,"bars");channel=l.channel;cc=l.cc;minimum=get(i,"min")*.01f;maximum=get(i,"max")*.01f;depth=get(i,"depth")*.01f;offset=get(i,"offset")*.01f;smooth=get(i,"smooth");beats=JUCEApplicationBase::isStandaloneApp()?4:hostBeats.load();}
+    MidiMessageSequence seq;double length;int channel,cc;Lane l;lanemath::Params prm;double beats;
+    {const ScopedLock lock(mutex);l=lanes[(size_t)i];length=get(i,"bars");channel=l.channel;cc=l.cc;prm=params(i);beats=JUCEApplicationBase::isStandaloneApp()?4:hostBeats.load();}
     constexpr int ppq=960;int end=jmax(1,roundToInt(length*beats*ppq));int last=-1;float filtered=0;bool valid=false;
     const double bpm=JUCEApplicationBase::isStandaloneApp()?standaloneBpm.load():hostTempo.load();
-    auto add=[&](int tick){float v=l.curve.at((double)tick/end+offset);float wanted=jlimit(0.f,1.f,minimum+(maximum-minimum)*(.5f+depth*(v-.5f)));
-        if(!valid){filtered=wanted;valid=true;}else{float alpha=smooth<=0?1.f:(float)(1-std::exp(-(10.0/ppq*60/bpm)/(smooth*.001)));filtered+=alpha*(wanted-filtered);}
+    auto add=[&](int tick){float v=l.curve.at((double)tick/end+prm.offset*.01);float wanted=lanemath::shape(v,prm);
+        if(!valid){filtered=wanted;valid=true;}else{float alpha=prm.smooth<=0?1.f:(float)(1-std::exp(-(10.0/ppq*60/bpm)/(prm.smooth*.001)));filtered+=alpha*(wanted-filtered);}
         int value=jlimit(0,127,roundToInt(filtered*127));if(value!=last){auto m=MidiMessage::controllerEvent(channel,cc,value);m.setTimeStamp(tick);seq.addEvent(m);last=value;}};
     for(int tick=0;tick<end;tick+=10)add(tick);if((end-1)%10)add(end-1);
     auto finish=MidiMessage::endOfTrack();finish.setTimeStamp(end);seq.addEvent(finish);MidiFile midi;midi.setTicksPerQuarterNote(ppq);midi.addTrack(seq);

@@ -1,11 +1,12 @@
 #pragma once
 #include <JuceHeader.h>
 #include "Curve.h"
+#include "LaneMath.h"
 #include <map>
 #include <optional>
-class CurvePilot final:public juce::AudioProcessor,private juce::Timer,private juce::AudioProcessorValueTreeState::Listener {
+class CurvePilot final:public juce::AudioProcessor,private juce::HighResolutionTimer,private juce::AudioProcessorValueTreeState::Listener {
 public:
-    static constexpr int laneCount=4;
+    static constexpr int laneCount=8;
     struct Lane {
         curve::Data curve=curve::preset(0,4);
         juce::String name,script,motionText,port;
@@ -24,7 +25,7 @@ public:
     std::atomic<int> revision{0};
     juce::String status="Choisir une destination, connecter, puis activer l'envoi.";
     int editorWidth=720,editorHeight=820,selectedLaneUI=0;
-    bool sending=false;
+    std::atomic<bool> sending{false};
     std::atomic<bool> standalonePlaying{false},transportReset{false};
     std::atomic<double> standaloneBpm{120};
     Lane getLane(int);
@@ -55,10 +56,17 @@ private:
     std::optional<Lane> clipboard;
     std::array<std::atomic<bool>,laneCount> manualRequests{};
     std::array<juce::String,laneCount> valueIds;
-    std::map<juce::String,std::unique_ptr<juce::MidiOutput>> outputs;
+    // shared_ptr: the sender thread keeps an output alive while sending after releasing the mutex.
+    std::map<juce::String,std::shared_ptr<juce::MidiOutput>> outputs;
     std::atomic<unsigned> transportSequence{0};
     std::atomic<double> hostQuarter{0},hostTempo{120},hostBeats{4},hostStamp{0};
     double localQuarter=0,lastTick=0;
-    void timerCallback()override;void parameterChanged(const juce::String&,float)override;
+    // Runs on a dedicated high-resolution thread (not the UI thread): computes under the mutex, sends after releasing it.
+    void hiResTimerCallback()override;void parameterChanged(const juce::String&,float)override;
+    // Cached parameter pointers: no String allocation on the audio thread.
+    enum Key{kOn,kMin,kMax,kBars,kOffset,kSmooth,kDepth,kValue,keyCount};
+    std::array<std::array<std::atomic<float>*,keyCount>,laneCount> rawParam{};
+    float raw(int lane,Key k)const noexcept{return rawParam[(size_t)lane][(size_t)k]->load();}
+    lanemath::Params params(int lane)const noexcept{return {raw(lane,kMin),raw(lane,kMax),raw(lane,kBars),raw(lane,kOffset),raw(lane,kSmooth),raw(lane,kDepth),raw(lane,kValue)};}
     bool routesValid();void resetOutputValues();
 };

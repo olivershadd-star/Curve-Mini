@@ -6,7 +6,7 @@
 #include <iostream>
 int main(){
     juce::ScopedJuceInitialiser_GUI init;CurvePilot p;
-    assert(p.acceptsMidi()&&p.producesMidi()&&p.getParameters().size()==32&&CurvePilot::laneCount==4);
+    assert(p.acceptsMidi()&&p.producesMidi()&&p.getParameters().size()==64&&CurvePilot::laneCount==8);
     auto original=p.getLane(0).curve;
     p.replacePoints(0,{{0,0},{.5,1},{1,0}});assert(p.getLane(0).pointMode&&p.getLane(0).curve.y[1024]==1);
     p.copyCurve(0);p.configureDestination(1,true,"usb-b",2,74,"Filtre");p.pasteCurve(1);
@@ -41,5 +41,16 @@ int main(){
     juce::MemoryBlock old;juce::AudioProcessor::copyXmlToBinary(*legacy.createXml(),old);restored.setStateInformation(old.getData(),(int)old.getSize());
     assert(restored.getLane(1).curve.y==drawing.y&&restored.getLane(1).port.isEmpty()&&restored.get(1,"on")==0&&!restored.sending);
     auto state=restored.state.copyState();state.getChildWithProperty("id","lane2_bars").setProperty("value",-5.0,nullptr);parameters.removeAllChildren(nullptr);parameters.addChild(state,-1,nullptr);juce::AudioProcessor::copyXmlToBinary(*legacy.createXml(),old);restored.setStateInformation(old.getData(),(int)old.getSize());assert(restored.get(1,"bars")==.25f);
+    // Eight lanes: defaults, parameters and routing of the last lines, and sessions saved with four lanes.
+    {CurvePilot eight;for(int i=0;i<8;++i)assert(eight.getLane(i).cc==20+i&&eight.getLane(i).channel==16&&eight.getLane(i).port.isEmpty());
+     eight.configureDestination(7,true,"usb-h",5,81,"Drive");eight.set(7,"value",100);assert(eight.isManual(7)&&eight.getLane(7).cc==81&&eight.get(7,"value")==100);
+     juce::MemoryBlock blob8;eight.getStateInformation(blob8);CurvePilot back;back.setStateInformation(blob8.getData(),(int)blob8.getSize());
+     assert(back.getLane(7).port=="usb-h"&&back.getLane(7).cc==81&&back.get(7,"value")==100&&back.isManual(7));
+     auto tree=juce::ValueTree::fromXml(*juce::AudioProcessor::getXmlFromBinary(blob8.getData(),(int)blob8.getSize()));
+     auto params=tree.getChildWithName("CurvePilot");for(int k=params.getNumChildren();--k>=0;){auto id=params.getChild(k)["id"].toString();if(id.startsWith("lane5_")||id.startsWith("lane6_")||id.startsWith("lane7_")||id.startsWith("lane8_"))params.removeChild(k,nullptr);}
+     auto content=tree.getChildWithName("CONTENT");for(int k=content.getNumChildren();--k>=0;)if(content.getChild(k).hasType("LANE")&&(int)content.getChild(k)["index"]>=4)content.removeChild(k,nullptr);
+     juce::MemoryBlock blob4;juce::AudioProcessor::copyXmlToBinary(*tree.createXml(),blob4);
+     CurvePilot old4;old4.setStateInformation(blob4.getData(),(int)blob4.getSize());
+     assert(old4.getLane(5).cc==25&&old4.getLane(5).port.isEmpty()&&old4.get(5,"on")==0&&old4.get(5,"bars")==4&&old4.get(7,"value")==64&&!old4.isManual(7));}
     std::cout<<"PASS: points, clipboard preserves destination, undo preserves new routing, locks, MIDI takeover, state, editor, silent audio and CC-only SMF export\n";
 }

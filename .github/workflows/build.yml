@@ -1,7 +1,7 @@
 name: Curve Mini Precision MIDI Windows
 on:
   push:
-    branches: [precision-midi-v05]
+    branches: [precision-midi-v05, v06-huit-lignes]
   workflow_dispatch:
 permissions:
   contents: read
@@ -13,7 +13,7 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
       - name: Build
-        run: cmake --build build --config Release --target curve_tests motion_tests processor_tests vst3_test window_placement_tests CurveMini_Standalone --parallel 2
+        run: cmake --build build --config Release --target curve_tests motion_tests lane_math_tests processor_tests vst3_test window_placement_tests CurveMini_Standalone --parallel 2
       - name: Test
         run: ctest --test-dir build -C Release --output-on-failure
       - uses: actions/upload-artifact@v4
